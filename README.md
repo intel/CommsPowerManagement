@@ -10,7 +10,7 @@ specific cores using an easy-to-use menu.
 
 It is required to disable the intel_pstate kernel driver, as this may disrupt
 with the configuration enabled buy the script. To achieve this, we need to
-add `intel_pstate=disabled` to the kernel boot parameters. Typically this iss
+add `intel_pstate=disable` to the kernel boot parameters. Typically this iss
 done by editing `/boot/grub2/grub.cfg`, and adding to the relevant kernel
 parameter line (it may be slightly different on different operating systems).
 
