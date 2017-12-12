@@ -145,7 +145,7 @@ function enable_pkg_turbo {
 		state=$(rdmsr -p${core} 0x1a0 -f 38:38)
 		if [[ $state -eq 1 ]]; then
 			echo "TURBO disabled on core $socket, attempting to enable..."
-			val="0x"$(rdmsr -p0 ${PLATFORM_INFO} -f 15:8)
+			val="0x"$(rdmsr -p0 0x1a0)
 			# switch off the TURBO_DISABLE bit
 			val=$(( val & ~0x4000000000 ))
 			val=$(printf '0x%X\n' "$val")
@@ -180,7 +180,7 @@ function disable_pkg_turbo {
 		state=$(rdmsr -p${core} 0x1a0 -f 38:38)
 		if [[ $state -eq 0 ]]; then
 			echo "TURBO enabled on socket $socket, attempting to disable..."
-			val="0x"$(rdmsr -p0 ${PLATFORM_INFO} -f 15:8)
+			val="0x"$(rdmsr -p0 0x1a0)
 			# switch on the TURBO_DISABLE bit
 			val=$(( val | 0x4000000000 ))
 			val=$(printf '0x%X\n' "$val")
@@ -305,7 +305,7 @@ function enable_per_core_turbo {
 show_menu(){
 
 	#check if MSR tool is installed
-	which wrmsr 2>&1
+	which wrmsr >/dev/null 2>/dev/null
 	MSR_TOOL=$?
 
     	printf "\n\n$C_YELLOW********************************************************$C_NORMAL\n"
