@@ -14,7 +14,7 @@ The scripts provided are as follows:
 [power.py](power.md) is written in python, and is the preferred method
 for adjusting the frequencies and Turbo-Boost availability. This script also 
 allows command-line paramaters, allowing easy integration into other scripts or
-cron jobs.
+cron jobs. This script allows the adjustment of P-states, C-states and Turbo-Boost.
 
 [turbo-cores.sh](turbo-cores.md) is written in shell scripts, and reads and 
 writes Model Specific Registers (MSRs) to read configuration, and change
