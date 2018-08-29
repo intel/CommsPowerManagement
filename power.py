@@ -18,7 +18,14 @@ govList = []
 scriptname = "power.py"
 
 def check_driver():
-	drvFile = open(DRV_FILE,'r')
+	try:
+		drvFile = open(DRV_FILE,'r')
+	except:
+		print()
+		print("ERROR: No pstate driver file found.")
+		print("       Are P-States enabled in the system BIOS?")
+		print()
+		return 0
 	driver = drvFile.readline().strip("\n")
 	drvFile.close()
 	if driver == "acpi-cpufreq":
