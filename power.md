@@ -5,10 +5,11 @@ specific cores using command line parameters or an easy-to-use menu.
 It allows adjustment of P-States and C-States through the 
 Linux kernel /proc file system interface. 
 
-# Prerequisites
+# Additional Setup Notes
 
-It is required to disable the intel_pstate kernel driver, as this may disrupt
-the configuration enabled by the script. To achieve this, we need to
+This script works with both acpi-cpufreq and intel_pstate drivers, although
+functionality may be slightly different between them. If you wish to to
+disable the intel_pstate kernel driver, we need to
 add `intel_pstate=disable` to the kernel boot parameters. Typically this is
 done by editing `/boot/grub2/grub.cfg` or `/etc/default/grub`, and adding
 to the relevant kernel parameter line (it may be slightly different on

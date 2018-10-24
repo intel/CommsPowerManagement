@@ -5,7 +5,10 @@ from __future__ import print_function
 import os
 import sys, getopt
 import re
+import struct
 
+CPU_MAX_FILE = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
+CPU_MIN_FILE = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq"
 MAX_FILE = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq"
 MIN_FILE = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq"
 FREQ_FILE = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies"
@@ -16,8 +19,34 @@ freqs = []
 stateList = []
 govList = []
 scriptname = "power.py"
+driver = ""
+freq_P0 = 0
+freq_P1 = 0
+freq_P1n = 0
+
+# Read a 64-byte value from an MSR through the sysfs interface.
+# Returns an 8-byte binary packed string.
+def rdmsr(core, msr):
+	msr_filename = "/dev/cpu/" + str(core) + "/msr"
+	msr_file = os.open(msr_filename, os.O_RDONLY)
+	os.lseek(msr_file, msr, os.SEEK_SET)
+	regstr = os.read(msr_file, 8)
+	return regstr
+
+
+def get_cpu_base_frequency(core):
+	regstr = rdmsr(0,0xCE) # MSR_PLATFORM_INFO
+	# Unpack the 8 bytes into array of unsigned chars
+	bytes = struct.unpack('BBBBBBBB', regstr)
+	# Byte 1 contains the max non-turbo frequecy
+	P1 = bytes[1]*100
+	return P1
+
 
 def check_driver():
+	global driver
+	global freq_P1
+
 	try:
 		drvFile = open(DRV_FILE,'r')
 	except:
@@ -30,34 +59,68 @@ def check_driver():
 	drvFile.close()
 	if driver == "acpi-cpufreq":
 		return 1
+	elif driver == "intel_pstate":
+		ret = os.system("lsmod | grep msr >/dev/null")
+		if (ret != 0):
+			print("ERROR: Need the 'msr' kernel module when " +
+				"using the '" + driver + "' driver")
+			print("Please run 'modprobe msr'")
+			sys.exit(1)
+		print()
+
+		print("WARNING: Current pstate driver is '" + driver + "'")
+		print("         Some options may be unavailable.")
+		print()
+		# get the P1 frequency
+		freq_P1 = get_cpu_base_frequency(11)
+		print("CPU Base Frequency (P1): " + str(freq_P1) + "MHz")
+		return 1
 	else:
 		print()
-		print("ERROR: Current pstate driver is '" + driver + "'")
-		print("       This script is only supported with the acpi-cpufreq driver.")
-		print("       Please add 'intel_pstate=disable' to kernel boot parameters.")
+		print("WARNING: Current pstate driver is '" + driver + "'")
+		print("         Some options may be unavailable.")
 		print()
-		return 0
+		return 1
 
-def show_pstates():
-	freqFile = open(FREQ_FILE)
-	frequencies = freqFile.readline().strip("\n")
-	freqFile.close()
-	freqList = frequencies.split(" ")
-	freqList = list(filter(len, freqList))
-
-	freqs = list(map(int, freqList))
-	for x in range(0,len(freqs)):
-		freqs[x] = int(freqs[x])/1000
+def get_pstates():
+	global freq_P0
+	global freq_P1n
+	if driver == "acpi-cpufreq":
+		freq_file = open(FREQ_FILE)
+		frequencies = freq_file.readline().strip("\n")
+		freq_file.close()
+		freq_list = frequencies.split(" ")
+		freq_list = list(filter(len, freq_list))
+		freqs = list(map(int, freq_list))
+		for x in range(0,len(freqs)):
+			freqs[x] = int(freqs[x])/1000
+	else:
+		min_file = open(CPU_MIN_FILE)
+		min = int(min_file.readline().strip("\n"))/1000
+		min_file.close()
+		freq_P1n = min
+		max_file = open(CPU_MAX_FILE)
+		max = int(max_file.readline().strip("\n"))/1000
+		max_file.close()
+		freq_P0 = max
+		freqs = []
+		for i in range(min, max+1, 100):
+			freqs.append(i)
 
 	freqs.sort(reverse=True)
-	s = "Available P-States: " + str(freqs)
-	print(s)
-
-	if (freqs[0]-1 == freqs[1]):
-		print("Turbo Available (use pstate '" + str(freqs[0]) + "')")
-	else:
-		print("Turbo Unavailable")
 	return freqs
+
+def show_pstates():
+	freq_list = get_pstates()
+	print(" Available P-States: " + str(freq_list))
+
+	if (freq_list[0]-1 == freq_list[1]):
+		print("    Turbo Available: Yes (use pstate '" + str(freq_list[0]) + "')")
+	elif freq_P0 > freq_P1:
+		print("    Turbo Available: Yes (any pstate above '" + str(freq_P1) + "')")
+	else:
+		print("    Turbo Available: No")
+	return freq_list
 
 def get_cstates():
 	stateList = []
@@ -72,7 +135,7 @@ def get_cstates():
 
 def show_cstates():
 	stateList = get_cstates()
-	s = "Available C-States: " + str(stateList)
+	s = " Available C-States: " + str(stateList)
 	print(s)
 
 def get_governors():
@@ -89,10 +152,15 @@ def show_governors():
 	print(s)
 
 def getinfo():
+	global driver
+
+	print()
+	print("     P-State Driver: " + driver)
+	print(" CPU Base Frequency: " + str(freq_P1) + "MHz")
 	show_pstates()
 
 	cpucount = getcpucount()
-	s = "Number of CPUs: " + str(cpucount)
+	s = "     Number of CPUs: " + str(cpucount)
 	print(s)
 
 	show_governors()
@@ -109,19 +177,20 @@ def listinfo():
 	cstates = os.listdir("/sys/devices/system/cpu/cpu0/cpuidle")
 
 	print("")
-	print("==== ====== ====== ====== =========", end='')
+	print("==== ====== ====== ====== ===========", end='')
 	for x in cstates:
 		print(" =======", end='')
 	print("")
 	print("              P-STATE INFO              ", end='')
-	print("    C-STATES DISABLED?")
+	print("     C-STATES DISABLED?")
 
-	print("Core    Max    Min    Now  Governor", end='')
+	print("Core    Max    Min    Now    Governor", end='')
+	cstates = sorted(cstates)
 	for x in cstates:
 		name = getfileval("/sys/devices/system/cpu/cpu0/cpuidle/" + x + "/name")
 		print(" % 7s" % (name,), end='')
 	print("")
-	print("==== ====== ====== ====== =========", end='')
+	print("==== ====== ====== ====== ===========", end='')
 	for x in cstates:
 		print(" =======", end='')
 	print("")
@@ -133,7 +202,7 @@ def listinfo():
 		min = int(min)/1000
 		cur = int(cur)/1000
 		gov = getfileval("/sys/devices/system/cpu/cpu" + str(x) + "/cpufreq/scaling_governor")
-		print(" % 3d" % x, " ", max, " ", min, " ", cur, "% 9s" % gov, end='')
+		print("%s" % str(x).rjust(4), " %s" % str(max).rjust(5), " %s" % str(min).rjust(5), " %s" % str(cur).rjust(5), "% 11s" % gov, end='')
 		for y in cstates:
 			value = getfileval("/sys/devices/system/cpu/cpu" + str(x) + "/cpuidle/" + y + "/disable")
 			if int(value) > 0:
@@ -334,6 +403,7 @@ def do_menu():
 		cpurange = range_expand(cores)
 		print("Working with cores: " + str(cpurange))
 		set_min_cpu_freq(str(int(pstate)*1000), cpurange)
+
 	#("[7] Display Available C-States")
 	elif (text == "7"):
 		show_cstates()
@@ -368,6 +438,7 @@ def do_menu():
 		print("Unknown Option")
 
 if (check_driver() == 0):
+	print("Invalid Driver : [" + driver + "]")
 	sys.exit(1)
 
 try:
