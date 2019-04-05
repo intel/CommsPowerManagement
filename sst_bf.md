@@ -43,7 +43,7 @@ optional arguments:
   -r          Revert cores to minimum/Turbo. Set all cores to 800 minimum and
               3900 maximum.
   -t          Revert cores to minimum/P1. Set all cores to 800 minimum and
-              3900 maximum.
+              2300 maximum.
   -a          Mixed config A. Set high priority cores to 2700 minimum and 3900
               maximum, and set normal priority cores to 800 minimum and 2100
               maximum.
