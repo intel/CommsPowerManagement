@@ -510,7 +510,7 @@ HELP_TEXT_T = "Revert cores to min/P1 (set min/max to %s/%s)" % \
 HELP_TEXT_T_LONG = "Revert cores to minimum/P1. Set all cores to %s" \
       " minimum and %s maximum." % \
       (str(FREQ_P1N),
-       str(FREQ_P0))
+       str(FREQ_P1))
 PARSER.add_argument('-t', action="store_true", help=HELP_TEXT_T_LONG)
 
 HELP_TEXT_A = "Mixed config A (set min/max to %s/%s and %s/%s)" % \
