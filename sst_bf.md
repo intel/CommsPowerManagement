@@ -174,3 +174,45 @@ For 'Mixed Config B', the high priority cores are set to 2700 minimum and
 2700 maximum, and set normal priority cores to 800 minimum and 3900s
 maximum.
 
+# Emulating SST-BF
+
+If a suitable BIOS or Linux kernel is not available on the platform, SST-BF
+may be emulated by setting the min and max frequencies high on some of the
+cores. Typically this would be 6 or 8 cores at 2.7Ghz, and the remainder of
+the cores at 2.1GHz on a 20 core CPU. 
+
+The power.py python script (available in this repository) can be used to set
+up an emulated mode, with the administrator supplying the list of cores they
+want as high priority. 
+
+Turbo is enabled on the system. Hyper-threading is disabled. 
+
+Use the commands:
+
+```bash
+# First set max and min to be as wide as possible (3.9GHz and 1.0GHz).
+power.py -r 0-39 -M 3900 -m 1000
+
+# Set all cores to low priority (min/max at 2.1GHz)
+power.py -r 0-39 -g powersave -M 2100 -m 2100
+
+# Finally, set the high priority cores (min/max at 2.7GHz). These cores are just random cores. 6 cores per SKU on 6230N
+power.py -r 2,4,6,8,10,12,22,24,26,28,30,32 -g powersave -M 2700 -m 2700
+```
+
+Then using “power.py -l” we see the following:
+
+```bash
+==== ====== ====== ====== =========== ======= ======= ======= =======
+              P-STATE INFO                   C-STATES DISABLED?
+Core    Max    Min    Now    Governor    POLL      C1     C1E      C6
+==== ====== ====== ====== =========== ======= ======= ======= =======
+   0   2100   2100    800   powersave      no      no      no      no
+   1   2100   2100    800   powersave      no      no      no      no
+   2   2700   2700    800   powersave      no      no      no      no
+...
+  37   2100   2100   2100   powersave      no      no      no      no
+  38   2100   2100   1977   powersave      no      no      no      no
+  39   2100   2100   2101   powersave      no      no      no      no
+```
+
