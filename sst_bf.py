@@ -24,9 +24,10 @@ CPU_MAX_FILE = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
 CPU_MIN_FILE = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq"
 MAX_FILE = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq"
 MIN_FILE = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq"
+MSR_FILE = "/dev/cpu/0/msr"
 
 CPU_COUNT = 0
-SCRIPT_VERSION = "1.2h"
+SCRIPT_VERSION = "1.2i"
 
 # Read a 64-byte value from an MSR through the sysfs interface.
 # Returns an 8-byte binary packed string.
@@ -431,8 +432,9 @@ def do_menu():
 #
 # Do some prerequesite checks.
 #
-RET = os.system("lsmod | grep msr >/dev/null")
-if RET != 0:
+try:
+    open(MSR_FILE, "r")
+except IOError:
     print("ERROR: Need the 'msr' kernel module")
     print("Please run 'modprobe msr'")
     sys.exit(1)
