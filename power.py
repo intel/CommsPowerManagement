@@ -44,6 +44,7 @@ MIN_FILE = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq"
 FREQ_FILE = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies"
 GOV_FILE = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
 DRV_FILE = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_driver"
+MSR_FILE = "/dev/cpu/0/msr"
 pstateList = []
 freqs = []
 stateList = []
@@ -90,12 +91,12 @@ def check_driver():
 	if driver == "acpi-cpufreq":
 		return 1
 	elif driver == "intel_pstate":
-		ret = os.system("lsmod | grep msr >/dev/null")
-		if (ret != 0):
-			print("ERROR: Need the 'msr' kernel module when " +
-				"using the '" + driver + "' driver")
-			print("Please run 'modprobe msr'")
-			sys.exit(1)
+                try:
+                    open(MSR_FILE, "r")
+                except IOError:
+                    print("ERROR: Need the 'msr' kernel module")
+                    print("Please run 'modprobe msr'")
+                    sys.exit(1)
 		print()
 
 		print("WARNING: Current pstate driver is '" + driver + "'")
