@@ -6,6 +6,7 @@
 from __future__ import print_function
 import os
 import sys
+import time
 import re
 import struct
 import argparse
@@ -14,9 +15,9 @@ import textwrap
 
 # raw_input() is only available in python 2.
 try:
-        raw_input
+    raw_input
 except NameError:
-        raw_input = input
+    raw_input = input
 
 DRV_FILE = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_driver"
 BASE_FILE = "/sys/devices/system/cpu/cpu%d/cpufreq/base_frequency"
@@ -40,6 +41,18 @@ def __rdmsr(core, msr):
         return regstr
     except:
         print("Could not read from MSR 0x%x on core %i" % (msr, core))
+        raise
+
+# Writes a 64-byte value to an MSR through the sysfs interface.
+# Expects an 8-byte binary packed string in regstr.
+def __wrmsr(core, msr, regstr):
+    try:
+        msr_filename = os.path.join("/dev/cpu", str(core), "msr")
+        with open(msr_filename, "wb") as msr_file:
+            msr_file.seek(msr)
+            msr_file.write(regstr)
+    except IOError:
+        print("Could not write to MSR 0x%x on core %i" % (msr, core))
         raise
 
 # Read the HWP_ENABLED MSR
@@ -71,6 +84,20 @@ def get_cpu_base_frequency():
     # Byte 1 contains the max non-turbo frequecy
     freq_p1 = msr_bytes[1]*100
     return freq_p1
+
+# Set package UNCORE frequency
+def __set_uncore(freq):
+    freq = int(freq)/100
+    regstr = struct.pack('BBBBBBBB', freq, freq, 0, 0, 0, 0, 0, 0)
+    __wrmsr(0, 0x620, regstr)
+    __wrmsr(CPU_COUNT-1, 0x620, regstr)
+    time.sleep(0.1)
+
+# get package UNCORE frequency
+def __get_uncore():
+    regstr = __rdmsr(0, 0x621)
+    msr_bytes = struct.unpack('BBBBBBBB', regstr)
+    return int(msr_bytes[0]*100)
 
 # Get the CPU max frequency
 def get_cpu_max_frequency(core):
@@ -357,7 +384,7 @@ def __print_wrap(opt, text):
         else:
             print("    %s" % line)
 
-def print_help():
+def __print_help():
 
     print("")
     print_banner()
@@ -422,7 +449,7 @@ def do_menu():
     elif text == "v":
         show_version()
     elif text == "h":
-        print_help()
+        __print_help()
     elif text == "q":
         sys.exit(0)
     else:
@@ -457,9 +484,9 @@ if CPU_NAME == "":
     sys.exit(-1)
 
 FREQ_P1 = get_cpu_base_frequency()
-base = get_sst_bf_frequency(0)
-if base == FREQ_P1:
-    print("base_frequency not available in %s" % BASE_FILE )
+BASE = get_sst_bf_frequency(0)
+if BASE == FREQ_P1:
+    print("base_frequency not available in %s" % BASE_FILE)
     sys.exit(-1)
 FREQ_P0 = get_cpu_max_frequency(0) / 1000
 FREQ_P1N = get_cpu_min_frequency(0) / 1000
@@ -549,6 +576,9 @@ PARSER.add_argument('-i', action="store_true", help=HELP_TEXT_I)
 HELP_TEXT_L = "List High Priority cores"
 PARSER.add_argument('-l', action="store_true", help=HELP_TEXT_L)
 
+HELP_TEXT_U = "Set UNCORE frequency, e.g. -u 1800 sets to 1.8GHz"
+PARSER.add_argument('-u', type=int, help=HELP_TEXT_U)
+
 HELP_TEXT_V = "Show script version"
 PARSER.add_argument('-v', action="store_true", help=HELP_TEXT_V)
 
@@ -579,6 +609,11 @@ if ARGS.i:
     sys.exit(0)
 if ARGS.l:
     list_sst_bf_cores()
+    sys.exit(0)
+if ARGS.u:
+    __set_uncore(ARGS.u)
+    UNCORE_FREQ = __get_uncore()
+    print("Uncore frequency now running at %dMHz" % UNCORE_FREQ)
     sys.exit(0)
 if ARGS.v:
     show_version()
