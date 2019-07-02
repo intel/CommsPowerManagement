@@ -28,7 +28,7 @@ MIN_FILE = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq"
 MSR_FILE = "/dev/cpu/0/msr"
 
 CPU_COUNT = 0
-SCRIPT_VERSION = "1.2j"
+SCRIPT_VERSION = "1.2k"
 
 # Read a 64-byte value from an MSR through the sysfs interface.
 # Returns an 8-byte binary packed string.
