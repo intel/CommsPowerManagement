@@ -367,6 +367,29 @@ def list_sst_bf_cores():
         coremask = coremask + (2**core)
     print(hex(coremask).rstrip('L'))
 
+def list_sst_bf_normal_cores():
+    """Short, comma-separated list of bf normal cores."""
+
+    freq_p1 = get_cpu_base_frequency()
+    cores = []
+
+    for core in range(0, CPU_COUNT):
+        base = get_sst_bf_frequency(core)
+        if base <= freq_p1:
+            cores.append(core)
+    print(*cores, sep=",")
+
+    # Coremask may be bigger than 64-bit number, but Python 2 and 3 handle big numbers differently
+    # Python 2 has 'long' type while Python 3 uses 'int'.
+    try:
+        coremask = long(0)
+    except NameError:
+        coremask = int(0)
+
+    for core in cores:
+        coremask = coremask + (2**core)
+    print(hex(coremask).rstrip('L'))
+
 def print_banner():
     """Print script banner."""
     print("----------------------------------------------------------")
@@ -397,6 +420,7 @@ def __print_help():
     __print_wrap('b', HELP_TEXT_B_LONG)
     print("[i] %s" % HELP_TEXT_I)
     print("[l] %s" % HELP_TEXT_L)
+    print("[n] %s" % HELP_TEXT_N)
     print("[v] %s" % HELP_TEXT_V)
     print("[h] %s" % HELP_TEXT_H)
     print("    Run script with no arguments for interactive menu")
@@ -423,6 +447,7 @@ def do_menu():
     print("[b] %s" % HELP_TEXT_B)
     print("[i] %s" % HELP_TEXT_I)
     print("[l] %s" % HELP_TEXT_L)
+    print("[n] %s" % HELP_TEXT_N)
     print("[v] %s" % HELP_TEXT_V)
     print("[h] %s" % HELP_TEXT_H)
     print("")
@@ -446,6 +471,8 @@ def do_menu():
         query_sst_bf()
     elif text == "l":
         list_sst_bf_cores()
+    elif text == "n":
+        list_sst_bf_normal_cores()
     elif text == "v":
         show_version()
     elif text == "h":
@@ -576,6 +603,9 @@ PARSER.add_argument('-i', action="store_true", help=HELP_TEXT_I)
 HELP_TEXT_L = "List High Priority cores"
 PARSER.add_argument('-l', action="store_true", help=HELP_TEXT_L)
 
+HELP_TEXT_N = "List Normal Priority cores"
+PARSER.add_argument('-n', action="store_true", help=HELP_TEXT_N)
+
 HELP_TEXT_U = "Set UNCORE frequency, e.g. -u 1800 sets to 1.8GHz"
 PARSER.add_argument('-u', type=int, help=HELP_TEXT_U)
 
@@ -609,6 +639,9 @@ if ARGS.i:
     sys.exit(0)
 if ARGS.l:
     list_sst_bf_cores()
+    sys.exit(0)
+if ARGS.n:
+    list_sst_bf_normal_cores()
     sys.exit(0)
 if ARGS.u:
     __set_uncore(ARGS.u)
