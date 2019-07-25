@@ -19,4 +19,7 @@ Intel® Speed Select Technology - Base Frequency (Intel® SST-BF).
 This allows some cores to run at a higher base frequency than
 others.
 
+[pwr.py](pwr.md) a python library which can be imported into an application,
+to measure/modify core freqencies of a CPU to utilize Intel® Speed Select Technology.
+
 Please click on the links to see more information on the scripts.
