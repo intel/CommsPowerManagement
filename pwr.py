@@ -84,9 +84,7 @@ class Core(object):
             self._min_desired_filename: "min_freq",
             self._epp_filename: "epp"
         }
-        max_freq = 3900
-        min_freq = 800
-        valid_range = [v for v in range(min_freq, max_freq + 100, 100)]
+        valid_range = [v for v in range(self.lowest_freq, self.highest_freq + 100, 100)]
 
         # Get desired min & max
         for file_name, attr in files_map.items():
