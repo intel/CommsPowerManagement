@@ -4,6 +4,12 @@ This is a python module which allows an application to modify power attributes o
 frequnecy of the uncore, frequency profiles can be set to achieve desired performance, as well as that capabilities of a CPU can be obtained and its frequency and power consumption stats monitored.  
 The library will provide a list of core and/or CPU objects whose attributes can be modified and committed to make changes on the CPU.
 
+# Installation
+
+The module can be installed with pip using the following command:
+
+pip install "git+https://github.com/intel/CommsPowerManagement.git#egg=pwr&subdirectory=pwr"
+
 ## Initialization 
 Creation of the cpu and core object lists is done using the `get_cores()/get_cpus()` functions, which return a list of the respective objects.
 
