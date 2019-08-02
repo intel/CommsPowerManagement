@@ -597,7 +597,7 @@ def _populate_cores_cpus():
         cpu_obj.core_list.append(core_obj)
 
         # Check if core is high priority, depending on base frequency
-        if core_obj.sst_bf_base_freq > core_obj.base_freq:
+        if cpu_obj.sst_bf_enabled and core_obj.sst_bf_base_freq > core_obj.base_freq:
             core_obj.high_priority = True
 
         # Add core object to core list
