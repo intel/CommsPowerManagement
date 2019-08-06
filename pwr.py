@@ -84,9 +84,7 @@ class Core(object):
             self._min_desired_filename: "min_freq",
             self._epp_filename: "epp"
         }
-        max_freq = 3900
-        min_freq = 800
-        valid_range = [v for v in range(min_freq, max_freq + 100, 100)]
+        valid_range = [v for v in range(self.lowest_freq, self.highest_freq + 100, 100)]
 
         # Get desired min & max
         for file_name, attr in files_map.items():
@@ -599,7 +597,7 @@ def _populate_cores_cpus():
         cpu_obj.core_list.append(core_obj)
 
         # Check if core is high priority, depending on base frequency
-        if core_obj.sst_bf_base_freq > core_obj.base_freq:
+        if cpu_obj.sst_bf_enabled and core_obj.sst_bf_base_freq > core_obj.base_freq:
             core_obj.high_priority = True
 
         # Add core object to core list
