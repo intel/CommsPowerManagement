@@ -6,7 +6,7 @@ from setuptools import setup
 
 setup(
     name='pwr',
-    version='0.1',
+    version='0.1.1',
     description='Python library providing various tools to work with Intel processors',
     long_description=
 """The 'pwr' library is built to help take advantage of various Intel processor features such as:
