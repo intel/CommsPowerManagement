@@ -1,14 +1,35 @@
+#!/usr/bin/env python
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2019 Intel Corporation
+
 from setuptools import setup
 
 setup(
     name='pwr',
     version='0.1',
-    description='Intel pwr library',
+    description='Python library providing various tools to work with Intel processors',
+    long_description=
+"""The 'pwr' library is built to help take advantage of various Intel processor features such as:
+ - Core and uncore frequency scaling
+ - SST-BF technology
+ - SST-CP technology
+It is intended to be used to build various orchestration and platform power management tools.""",
+    provides=["pwr"],
     url='https://github.com/intel/CommsPowerManagement',
     author='Intel Corporation',
     py_modules=["pwr"],
+    project_urls={
+        "Bug Tracker": "https://github.com/intel/CommsPowerManagement/issues",
+        "Documentation": "https://github.com/intel/CommsPowerManagement/blob/master/pwr.md",
+        "Source Code": "https://github.com/intel/CommsPowerManagement/blob/master/pwr/",
+    },
+    license='BSD-3-Clause',
+    platforms=['Linux'],
     classifiers=[
+        'Intended Audience :: Developers',
+        'Operating System :: POSIX :: Linux',
         'License :: OSI Approved :: BSD License',
+        'Programming Language :: Python',
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
