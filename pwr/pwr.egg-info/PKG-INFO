@@ -1,13 +1,23 @@
 Metadata-Version: 1.2
 Name: pwr
-Version: 0.1
-Summary: Intel pwr library
+Version: 0.1.1
+Summary: Python library providing various tools to work with Intel processors
 Home-page: https://github.com/intel/CommsPowerManagement
 Author: Intel Corporation
-License: UNKNOWN
-Description: UNKNOWN
-Platform: UNKNOWN
+License: BSD-3-Clause
+Project-URL: Bug Tracker, https://github.com/intel/CommsPowerManagement/issues
+Project-URL: Documentation, https://github.com/intel/CommsPowerManagement/blob/master/pwr.md
+Project-URL: Source Code, https://github.com/intel/CommsPowerManagement/blob/master/pwr/
+Description: The 'pwr' library is built to help take advantage of various Intel processor features such as:
+         - Core and uncore frequency scaling
+         - SST-BF technology
+         - SST-CP technology
+        It is intended to be used to build various orchestration and platform power management tools.
+Platform: Linux
+Classifier: Intended Audience :: Developers
+Classifier: Operating System :: POSIX :: Linux
 Classifier: License :: OSI Approved :: BSD License
+Classifier: Programming Language :: Python
 Classifier: Programming Language :: Python :: 2
 Classifier: Programming Language :: Python :: 2.7
 Classifier: Programming Language :: Python :: 3
@@ -17,4 +27,5 @@ Classifier: Programming Language :: Python :: 3.5
 Classifier: Programming Language :: Python :: 3.6
 Classifier: Programming Language :: Python :: 3.7
 Classifier: Programming Language :: Python :: 3.8
+Provides: pwr
 Requires-Python: >=2.7, !=3.0.*, !=3.1.*, !=3.2.*, <4

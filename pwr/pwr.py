@@ -493,7 +493,7 @@ def _read_sysfs(filename):
 CORES = []
 CPUS = []
 
-def get_cores():
+def get_cores():  # type: () -> List[Core]
     """
     External API to create core object list, both core and cpu
     lists will be created on either get_cores or get_cpus function calls,
@@ -504,7 +504,7 @@ def get_cores():
         _init()
     return CORES
 
-def get_cpus():
+def get_cpus():  # type: () -> List[CPU]
     """
     External API to create cpu object list, both core and cpu
     lists will be created on either get_cpu or get_cores function calls,
