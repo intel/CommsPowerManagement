@@ -179,7 +179,7 @@ def get_cpu_name():
 
     valid_cpus = ["6252N", "6230N", "5218N"]
 
-    pargs = ["cpuid", "-i", "-1"]
+    pargs = ["lscpu"]
     try:
         output = subprocess.check_output(pargs).decode()
     except (subprocess.CalledProcessError, OSError):
