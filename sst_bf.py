@@ -28,7 +28,7 @@ MIN_FILE = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq"
 MSR_FILE = "/dev/cpu/0/msr"
 
 CPU_COUNT = 0
-SCRIPT_VERSION = "1.2k"
+SCRIPT_VERSION = "1.2j"
 
 # Read a 64-byte value from an MSR through the sysfs interface.
 # Returns an 8-byte binary packed string.
@@ -122,6 +122,7 @@ def get_cpu_min_frequency(core):
         print("WARNING: cpuinfo_min_freq sysfs entry not found")
         minimum = 0
     return minimum
+
 # Get the scaling max frequency
 def get_scaling_max_frequency(core):
     """ Get the scaling max frequency"""
@@ -152,7 +153,7 @@ def get_sst_bf_frequency(core):
     base_filename = "/sys/devices/system/cpu/cpu" + str(core) + "/cpufreq/base_frequency"
     try:
         with open(base_filename, 'r') as base_file:
-            base = int(base_file.readline().strip("\n"))/1000
+            base = int(base_file.readline().strip("\n")) // 1000
     except IOError:
         print("WARNING: base_frequency sysfs entry not found")
         base = FREQ_P1
@@ -335,8 +336,8 @@ def query_sst_bf():
         minimum = get_scaling_min_frequency(core)
         print(str(core).rjust(4) + " | " + \
             str(base).rjust(4) + "  " + \
-            str(maximum/1000).rjust(4) + "  " + \
-            str(minimum/1000).rjust(4) + " |")
+            str(int(maximum//1000)).rjust(4) + "  " + \
+            str(int(minimum//1000)).rjust(4) + " |")
         if base > freq_p1:
             p1_high = p1_high + 1
 
@@ -515,8 +516,8 @@ BASE = get_sst_bf_frequency(0)
 if BASE == FREQ_P1:
     print("base_frequency not available in %s" % BASE_FILE)
     sys.exit(-1)
-FREQ_P0 = get_cpu_max_frequency(0) / 1000
-FREQ_P1N = get_cpu_min_frequency(0) / 1000
+FREQ_P0 = get_cpu_max_frequency(0) // 1000
+FREQ_P1N = get_cpu_min_frequency(0) // 1000
 (FREQ_P1_HIGH, FREQ_P1_NORMAL) = get_issbf_cpu_freqs()
 
 SCRIPT_NAME = sys.argv[0]
