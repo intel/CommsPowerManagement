@@ -28,7 +28,7 @@ MIN_FILE = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq"
 MSR_FILE = "/dev/cpu/0/msr"
 
 CPU_COUNT = 0
-SCRIPT_VERSION = "1.2j"
+SCRIPT_VERSION = "1.2m"
 
 # Read a 64-byte value from an MSR through the sysfs interface.
 # Returns an 8-byte binary packed string.
@@ -317,6 +317,17 @@ def reverse_sst_bf_to_p1():
         set_max_cpu_freq(freq_p1*1000, core)
     query_sst_bf()
 
+def sst_bf_enabled():
+    prev = None
+    for core in range(0, CPU_COUNT):
+        base = get_sst_bf_frequency(core)
+        if not prev:
+            prev = base
+            continue
+        if prev != base:
+            return True  # we found at least one core that's different, bail out
+    return False  # all cores appear to be the same
+
 def query_sst_bf():
     """"Show information on sst-bf frequencies."""
 
@@ -516,6 +527,12 @@ BASE = get_sst_bf_frequency(0)
 if BASE == FREQ_P1:
     print("base_frequency not available in %s" % BASE_FILE)
     sys.exit(-1)
+
+if not sst_bf_enabled():
+    print("No High Priority Cores found. ")
+    print("Please ensure compatible BIOS and Kernel versions are being used.")
+    sys.exit(-1)
+
 FREQ_P0 = get_cpu_max_frequency(0) // 1000
 FREQ_P1N = get_cpu_min_frequency(0) // 1000
 (FREQ_P1_HIGH, FREQ_P1_NORMAL) = get_issbf_cpu_freqs()
