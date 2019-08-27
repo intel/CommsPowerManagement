@@ -28,7 +28,8 @@ MIN_FILE = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq"
 MSR_FILE = "/dev/cpu/0/msr"
 
 CPU_COUNT = 0
-SCRIPT_VERSION = "1.2m"
+ONLINE_CORES = []
+SCRIPT_VERSION = "1.2n"
 
 # Read a 64-byte value from an MSR through the sysfs interface.
 # Returns an 8-byte binary packed string.
@@ -99,6 +100,16 @@ def __get_uncore():
     msr_bytes = struct.unpack('BBBBBBBB', regstr)
     return int(msr_bytes[0]*100)
 
+# get the online status of a core
+def __is_online(core):
+    online_filename = "/sys/devices/system/cpu/cpu{}/online".format(core)
+    try:
+        with open(online_filename) as online_file:
+            return int(online_file.readline()) == 1
+    except IOError:
+        # If the file is not found, then the core is online
+        return True
+
 # Get the CPU max frequency
 def get_cpu_max_frequency(core):
     """ Get the CPU max frequency"""
@@ -164,7 +175,7 @@ def get_issbf_cpu_freqs():
 
     p1_high = 0
     p1_normal = 0
-    for core in range(0, CPU_COUNT):
+    for core in ONLINE_CORES:
         base = get_sst_bf_frequency(core)
         if p1_high == 0:
             p1_high = base
@@ -260,7 +271,7 @@ def set_sst_bf(mode):
 
     print("CPU Count = " + str(CPU_COUNT))
 
-    for core in range(0, CPU_COUNT):
+    for core in ONLINE_CORES:
         set_core_governor("powersave", core)
         set_max_cpu_freq(FREQ_P0*1000, core)
         base = get_sst_bf_frequency(core)
@@ -294,7 +305,7 @@ def reverse_sst_bf():
 
     print("CPU Count = " + str(CPU_COUNT))
 
-    for core in range(0, CPU_COUNT):
+    for core in ONLINE_CORES:
         maximum = get_cpu_max_frequency(core)
         set_max_cpu_freq(maximum, core)
         minimum = get_cpu_min_frequency(core)
@@ -309,7 +320,7 @@ def reverse_sst_bf_to_p1():
 
     freq_p1 = get_cpu_base_frequency()
 
-    for core in range(0, CPU_COUNT):
+    for core in ONLINE_CORES:
         maximum = get_cpu_max_frequency(core)
         set_max_cpu_freq(maximum, core)
         minimum = get_cpu_min_frequency(core)
@@ -319,7 +330,7 @@ def reverse_sst_bf_to_p1():
 
 def sst_bf_enabled():
     prev = None
-    for core in range(0, CPU_COUNT):
+    for core in ONLINE_CORES:
         base = get_sst_bf_frequency(core)
         if not prev:
             prev = base
@@ -341,7 +352,7 @@ def query_sst_bf():
     print("     |------sysfs-------|")
     print("Core | base   max   min |")
     print("-----|------------------|")
-    for core in range(0, CPU_COUNT):
+    for core in ONLINE_CORES:
         base = get_sst_bf_frequency(core)
         maximum = get_scaling_max_frequency(core)
         minimum = get_scaling_min_frequency(core)
@@ -362,7 +373,7 @@ def list_sst_bf_cores():
     freq_p1 = get_cpu_base_frequency()
     cores = []
 
-    for core in range(0, CPU_COUNT):
+    for core in ONLINE_CORES:
         base = get_sst_bf_frequency(core)
         if base > freq_p1:
             cores.append(core)
@@ -385,7 +396,7 @@ def list_sst_bf_normal_cores():
     freq_p1 = get_cpu_base_frequency()
     cores = []
 
-    for core in range(0, CPU_COUNT):
+    for core in ONLINE_CORES:
         base = get_sst_bf_frequency(core)
         if base <= freq_p1:
             cores.append(core)
@@ -521,6 +532,8 @@ CPU_NAME = get_cpu_name()
 if CPU_NAME == "":
     print("Unknown CPU")
     sys.exit(-1)
+
+ONLINE_CORES = list(filter(__is_online, range(0, CPU_COUNT)))
 
 FREQ_P1 = get_cpu_base_frequency()
 BASE = get_sst_bf_frequency(0)
