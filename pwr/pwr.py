@@ -36,10 +36,10 @@ class Core(object):
         self.cpu = cpu                                      # this cores cpu object
         self.thread_siblings = None                         # list of thread siblings
         self.high_priority = False                          # high/low priority
-        self.base_freq = cpu.base_freq                      # base freqeuncy
+        self.base_freq = cpu.base_freq                      # base frequency
         self.sst_bf_base_freq = None                        # priority based frequency
         self.all_core_turbo_freq = cpu.all_core_turbo_freq  # all core turbo freq
-        self.highest_freq = cpu.highest_freq                # single core turbo freqeuncy
+        self.highest_freq = cpu.highest_freq                # single core turbo frequency
         self.lowest_freq = cpu.lowest_freq                  # lowest active frequency
         self.curr_freq = None                               # current core frequency
         self.min_freq = None                                # desired low frequency
@@ -64,9 +64,9 @@ class Core(object):
 
     def read_capabilities(self):
         """
-	Get constant capabilities of core, this is called at core initialization
-	and does not need to be called by the application
-	"""
+        Get constant capabilities of core, this is called at core initialization
+        and does not need to be called by the application
+        """
         if self.cpu.sst_bf_enabled:
             # Priority based frequency value is only available if SST_BF is enabled
             file_name = os.path.join(BASE_PATH, self._cpu_name, "cpufreq", "base_frequency")
@@ -168,7 +168,7 @@ class Core(object):
                 _write_sysfs(self._min_desired_filename, self.min_freq * 1000)
                 _write_sysfs(self._max_desired_filename, self.max_freq * 1000)
             except IOError as err:
-                if err.errno != 22: #EINVAL
+                if err.errno != 22:  # EINVAL
                     raise
                 _write_sysfs(self._max_desired_filename, self.max_freq * 1000)
                 _write_sysfs(self._min_desired_filename, self.min_freq * 1000)
@@ -188,12 +188,12 @@ class Core(object):
         valid_range = [v for v in range(self.lowest_freq, self.highest_freq + 100, 100)]
 
         if self.min_freq not in valid_range:
-            raise ValueError("Cannot update core, min freq out of valid range."\
-	                            "Lowest: %s, Highest: %s" % (self.lowest_freq, self.highest_freq))
+            raise ValueError("Cannot update core, min freq out of valid range. "
+                             "Lowest: %s, Highest: %s" % (self.lowest_freq, self.highest_freq))
 
         if self.max_freq not in valid_range:
-            raise ValueError("Cannot update core, max freq out of valid range."\
-	    "Lowest: %s, Highest: %s" % (self.lowest_freq, self.highest_freq))
+            raise ValueError("Cannot update core, max freq out of valid range. "
+                             "Lowest: %s, Highest: %s" % (self.lowest_freq, self.highest_freq))
 
         if profile and profile not in core_profiles:  # Check if valid profile
             raise ValueError("Cannot set core profile %s, available profiles are %s" %
@@ -238,16 +238,16 @@ class CPU(object):
         self.uncore_max_freq = None     # max desired uncore frequency
         self.uncore_min_freq = None     # min desired uncore frequency
 
-        # private power consmuption-related data
+        # private power consumption-related data
         self._prev_power_cons_ts = None   # timestamp for previous power consumption data
         self._prev_power_cons_val = None  # previous power consumption data
         self._power_cons_max = None       # wraparound power consumption value
 
     def read_capabilities(self, core=None):
         """
-	Get constant capabilities of CPU, this is called at CPU initialization
-	and does not need to be called by application
-	"""
+        Get constant capabilities of CPU, this is called at CPU initialization
+        and does not need to be called by application
+        """
         if core is None:
             core = self.core_list[0].core_id
 

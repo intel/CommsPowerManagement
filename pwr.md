@@ -1,7 +1,7 @@
 # pwr module
 
-This is a python module which allows an application to modify power attributes of a CPU. Manipulation can be done to the frequency of cores, 
-frequnecy of the uncore, frequency profiles can be set to achieve desired performance, as well as that capabilities of a CPU can be obtained and its frequency and power consumption stats monitored.  
+This is a python module which allows an application to modify power attributes of a CPU. Manipulation can be done to the frequency of cores,
+frequency of the uncore, frequency profiles can be set to achieve desired performance, as well as that capabilities of a CPU can be obtained and its frequency and power consumption stats monitored.
 The library will provide a list of core and/or CPU objects whose attributes can be modified and committed to make changes on the CPU.
 
 # Installation
@@ -10,10 +10,10 @@ The module can be installed with pip using the following command:
 
 pip install "git+https://github.com/intel/CommsPowerManagement.git#egg=pwr&subdirectory=pwr"
 
-## Initialization 
+## Initialization
 Creation of the cpu and core object lists is done using the `get_cores()/get_cpus()` functions, which return a list of the respective objects.
 
-```python 
+```python
 import pwr  # Import the module
 
 cores = pwr.get_cores()  # Create core object list
@@ -47,7 +47,7 @@ Each cpu and core object have attributes which replicate the capabilities and st
 * `core_id`                 # logical core id number
 * `cpu`                     # this cores cpu object
 * `thread_siblings`         # list of other logical cores residing on same physical core
-* `high_prioirty`           # boolean value indicating whether the core will be set up to be a high priority core when SST-BF is configured.
+* `high_priority`           # boolean value indicating whether the core will be set up to be a high priority core when SST-BF is configured.
 * `base_freq`               # base frequency [2300Mhz]
 * `sst_bf_base_freq`        # priority based frequency [2100Mhz/2700Mhz]
 * `all_core_turbo_freq`     # all core turbo frequency [2800Mhz]
@@ -70,21 +70,21 @@ cpu.uncore_max_freq = cpu.uncore_hw_max  # Set the desired maximum uncore freque
 cpu.uncore_min_freq = cpu.uncore_hw_min  # Set the desired minimum uncore frequency to the lowest available
 ```
 
-### Committing 
-Modification of the power settings of a system is done by altering the core or CPU characteristics, as shown above, 
+### Committing
+Modification of the power settings of a system is done by altering the core or CPU characteristics, as shown above,
 then finalizing with the `commit()` function call.
-```python 
-cores = pwr.get_cores()  # Create the cores object list 
+```python
+cores = pwr.get_cores()  # Create the cores object list
 
 for core in cores:  # Loop through core objects in list
-    core.min_freq = core.base_freq  # Set the desired minimum frequency to be the base frequency 
+    core.min_freq = core.base_freq  # Set the desired minimum frequency to be the base frequency
     core.max_freq = core.highest_freq  # Set the desired maximum frequency to the highest available
     core.commit()  # Commit changes to be made on system
 ```
 
 
 ### Pre-set Profiles
-When an application is modifying the desired min and max core frequencies, pre-set configurations can also be applied, these will overwrite current configurations and commit the pre-sets.  
+When an application is modifying the desired min and max core frequencies, pre-set configurations can also be applied, these will overwrite current configurations and commit the pre-sets.
 * `minimum`:            Set all cores minimum to 800Mhz and maximum to 800Mhz.
 * `maximum`:            Set all cores minimum to 3900Mhz and maximum to 3900Mhz.
 * `base`:               Set all cores minimum to 2300Mhz and maximum to 2300Mhz.
@@ -101,7 +101,7 @@ For c in cores:
 ```
 ## Concept Overview
 ### CPU
-A CPU may have multiple physical cores, which are represented by the core objects. These cores can optionally have multiple threads, which means there would be multiple logical cores on a single physical core, these are called thread siblings. Each logical core will also have its own core object. Uncore frequency is the frequency at which everything on the CPU, except the cores, runs at. This can be scaled within the limits of min and max. 
+A CPU may have multiple physical cores, which are represented by the core objects. These cores can optionally have multiple threads, which means there would be multiple logical cores on a single physical core, these are called thread siblings. Each logical core will also have its own core object. Uncore frequency is the frequency at which everything on the CPU, except the cores, runs at. This can be scaled within the limits of min and max.
 ### Core
 Each core's frequency can scaled up or down, in the case of multiple logical cores on a physical core, both logical cores must have the same frequency for the physical core to operate at that frequency. Core frequencies can be set up to utilize the SST-BF configuration, if available. Energy performance profiles can be set up on a per core basis using a specific EPP policy, if the system configuration allows.
 
@@ -110,16 +110,17 @@ CPU stats can become out of date, such as `curr_freq` or `sst_bf_configured`. Th
 It is *advised* that CPU and core objects be updated with `refresh_stats()` before requesting object data.
 
 core.refresh_stats() will update:
-* `curr_freq`             
-* `min_freq`                
-* `max_freq`                
+* `curr_freq`
+* `min_freq`
+* `max_freq`
 * `epp`
-                
+
 cpu.refresh_stats() will update:
 * `uncore_freq`
-* `uncore_max_freq` 
+* `uncore_max_freq`
 * `uncore_min_freq`
 * `sst_bf_configured`
+* `power_consumption`
 
 ```python
 for c in cores:
@@ -132,9 +133,9 @@ for c in cores:
 Both CPU & core objects reference each other, the list of core objects can be accessed through the CPU and the CPU object of a core can be accessed through a core.
 
 ```python
-for core in cores:  # Loop through cores in object list 
+for core in cores:  # Loop through cores in object list
     if core.cpu.sst_bf_enabled:  # Access CPU flag from core object
-        if core.high_priority:  # Check if core has high priority base frequency 
+        if core.high_priority:  # Check if core has high priority base frequency
             core.min_freq = core.base_freq  # Modify minimum desired frequency
             core.max_freq = core.sst_bf_base_freq  # Modify maximum desired frequency
             core.commit()  # Commit changes to hardware
