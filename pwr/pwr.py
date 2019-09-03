@@ -161,7 +161,7 @@ class Core(object):
             if self.min_freq > self.max_freq:
                 raise ValueError("Cannot update core, desired min freq(%s) "
                                  "is greater than desired max freq(%s)" %
-                                 str(self.min_freq), str(self.max_freq))
+                                 (str(self.min_freq), str(self.max_freq)))
 
             try:
                 # Write desired min, if failure, retry after setting max.
@@ -436,7 +436,7 @@ class CPU(object):
         """ Update package wide MSRs with cpu object attributes """
         if self.uncore_min_freq > self.uncore_max_freq:
             raise("Cannot update uncore freq, desired min(%s) greater than desired max(%s)" %
-                  str(self.uncore_min_freq), str(self.uncore_max_freq))
+                  (str(self.uncore_min_freq), str(self.uncore_max_freq)))
         # Read all msr data as to not overwrite other MSR data on write
         read_regstr = _rdmsr(self.core_list[0].core_id, MSR_UNCORE_RATIO_LIMIT)
         data = struct.unpack('BBBBBBBB', read_regstr)
