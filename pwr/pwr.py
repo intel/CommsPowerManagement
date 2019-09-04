@@ -57,6 +57,9 @@ class Core(object):
         self._epp_available_filename = os.path.join(BASE_PATH, self._cpu_name,
                                                     "cpufreq",
                                                     "energy_performance_available_preferences")
+        self._sst_bf_base_filename = os.path.join(BASE_PATH,
+                                                  "cpu{}".format(id_num),
+                                                  "cpufreq", "base_frequency")
         try:
             self._epp_available = _read_sysfs(self._epp_available_filename)
         except (IOError, OSError) as err:
@@ -67,15 +70,16 @@ class Core(object):
         Get constant capabilities of core, this is called at core initialization
         and does not need to be called by the application
         """
-        if self.cpu.sst_bf_enabled:
-            # Priority based frequency value is only available if SST_BF is enabled
-            file_name = os.path.join(BASE_PATH, self._cpu_name, "cpufreq", "base_frequency")
-
+        if os.path.isfile(self._sst_bf_base_filename):
             try:
-                self.sst_bf_base_freq = int(_read_sysfs(file_name)) // 1000
+                self.sst_bf_base_freq = int(
+                    _read_sysfs(self._sst_bf_base_filename)) // 1000
             except (IOError, OSError) as err:
-                raise IOError("%s\nCould not read core %s base frequency from sysfs entry" %
-                              (err, str(self.core_id)))
+                raise IOError("{}\n"
+                              "Could not read core {} SST-BF base frequency "
+                              "from sysfs entry '{}'"
+                              .format(err, self.core_id,
+                                      self._sst_bf_base_filename))
 
     def refresh_stats(self):
         """ Get current regularly changing or user defined stats of core """
@@ -253,12 +257,6 @@ class CPU(object):
 
         powercap_cpu_base = os.path.join(BASE_POWERCAP_PATH, "intel-rapl:{}".format(self.cpu_id))
 
-        def check_sst_bf_enabled():
-            """ Check if SST_BF is enabled by checking for presence of base frequency file """
-            base_freq_path = os.path.join(BASE_PATH, "cpu{}".format(0), "cpufreq", "base_frequency")
-            enabled = os.path.isfile(base_freq_path)
-            return enabled
-
         def get_min_max_freq():
             """ Get package turbo frequency and lowest frequency """
             max_filename = os.path.join(BASE_PATH, "cpu{}".format(core),
@@ -332,7 +330,6 @@ class CPU(object):
                 raise ValueError("%s\nCould not parse TDP value" % err)
             return tdp
 
-        self.sst_bf_enabled = check_sst_bf_enabled()
         self.lowest_freq, self.highest_freq = get_min_max_freq()
         self.base_freq = get_base_freq()
         self.hwp_enabled = check_hwp()
@@ -597,7 +594,7 @@ def _populate_cores_cpus():
         cpu_obj.core_list.append(core_obj)
 
         # Check if core is high priority, depending on base frequency
-        if cpu_obj.sst_bf_enabled and core_obj.sst_bf_base_freq > core_obj.base_freq:
+        if core_obj.sst_bf_base_freq > core_obj.base_freq:
             core_obj.high_priority = True
 
         # Add core object to core list
@@ -608,9 +605,12 @@ def _populate_cores_cpus():
         # Update siblings list in core object list
         core.thread_siblings = [CORES[s] for s in ht_siblings_map[core.core_id]]
 
-    # Post core & cpu initialization, check if SST_BF is configured on all cores on cpu
+    # Post core & cpu initialization, check if SST-BF is enabled and configured
     for cpu in CPUS:
-        cpu.sst_bf_configured = _check_sst_bf_configured(cpu)
+        # if there's no sysfs base frequency, SST-BF is not supported
+        if cpu.core_list[0].sst_bf_base_freq:
+            cpu.sst_bf_enabled = _check_sst_bf_enabled(cpu)
+            cpu.sst_bf_configured = _check_sst_bf_configured(cpu)
 
 def _check_sst_bf_configured(cpu_obj):
     """
@@ -622,3 +622,19 @@ def _check_sst_bf_configured(cpu_obj):
             if core.min_freq != core.sst_bf_base_freq or core.max_freq != core.sst_bf_base_freq:
                 return False
     return True
+
+
+def _check_sst_bf_enabled(cpu_obj):
+    """
+    SST_BF is enabled when sysfs base frequencies differ between cores
+    """
+    prev_seen = None
+    for core in cpu_obj.core_list:
+        if not prev_seen:
+            prev_seen = core.sst_bf_base_freq
+            continue
+        # base frequencies differ, that means SST-BF is enabled
+        if prev_seen != core.sst_bf_base_freq:
+            return True
+    # base frequencies don't differ
+    return False
