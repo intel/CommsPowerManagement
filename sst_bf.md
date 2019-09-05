@@ -10,7 +10,12 @@ to revert to a state that does not use Intel® SST-BF as necessary.
 
 * An SST-BF enabled CPU
 * SST-BF enabled in the BIOS
-* Linux Kernel 4.20 or later
+* Linux Kernel 5.1 or later is recommended.
+* Linux kernel enabled with the following code changes.
+    https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/cpufreq?h=v4.20-rc4&id=86d333a8cc7f66c2314ab1e147834a1cd95ec2de
+    https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/acpi?h=v4.20-rc4&id=29523f095397637edca60c627bc3e5c25a02c40f
+    https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/acpi?h=v5.1-rc3&id=edef1ef134180149694b86386277076f566d165c
+    https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/cpufreq?h=v5.1-rc3&id=92a3e426ec06e72b1c363179c79d30712447ff76
 * Kernel using intel_pstate driver
 
 The script is compatible with any CPU with the Intel® SST-BF feature, for
@@ -26,6 +31,19 @@ line parameters are given.
 
 When executing the script with the '-h' command line parameter, the user is
 presented with help text (frequencies may vary for different CPUs):
+
+# Description of options
+[-s] This is the recommended setting for deterministic workloads and SST-BF. The frequency is set and fixed to a value on each of the high and normal priority cores. This is the standard recommended SST-BF configuration. The min and max of each core is set to avoid performance variation associated with frequency changing up or down. 
+
+[-m] This sets all cores on the server to the out of the box/P1 frequency. This is useful to unset the two tiers of SST-BF frequency and fix all the cores frequency to the marked frequency of the CPU. When using SST-BF CPU P states is enabled and introduces frequency scaling and using this script option avoid performance varation associated with frequency changing up or down. This is equivalent to disabling P States and the associated frequency scaling.
+
+[-r] This option reverts the CPU to and out of the box configuration where Intel Turbo Boost is enabled (up to max turbo frequency). SST-BF depends on Turbo and P states enabled in BIOS. The range of frequency is lowest P state to highest Turbo frequency. Hence, this is considered the starting configuraiton. The script includes this to allow the user easily revert to the coinfiguraion at boot time prior to SST-BF[-s] or P1 set on all cores[-m]
+
+[-t] This options set the CPU to and out of the box configuration where Intel Turbo Boost is disabled (P1 max core frequency).
+
+[-a] Allows high priority cores to Turbo up to max all core turbo. Performance gains are opportunistic as CPU is operating in Turbo range. Hence, not recommended as a deterministic configuraiton option.
+
+[-b] Allows normal priority cores to Turbo up to max all core turbo. Performance gains are opportunistic as CPU is operating in Turbo range. Hence, not recommended as a deterministic configuraiton option.
 
 ```bash
 # sst_bf.py -h
