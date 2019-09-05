@@ -8,6 +8,7 @@ import os
 import re
 import struct
 import time
+from .internal import cpuinfo
 
 MSR_PLATFORM_INFO = 0xCE
 MSR_TURBO_RATIO_LIMIT = 0x1AD
@@ -44,7 +45,7 @@ class Core(object):
         self.curr_freq = None                               # current core frequency
         self.min_freq = None                                # desired low frequency
         self.max_freq = None                                # desired high frequency
-        self.epp = ""                                       # energy performance preference
+        self.epp = None                                     # energy performance preference
 
         self._epp_available = []
         self._cpu_name = "cpu{}".format(self.core_id)
@@ -62,8 +63,9 @@ class Core(object):
                                                   "cpufreq", "base_frequency")
         try:
             self._epp_available = _read_sysfs(self._epp_available_filename)
-        except (IOError, OSError) as err:
-            raise IOError("%s\nCould not read available performance profiles" % err)
+        except (IOError, OSError):
+            # EPP is not available
+            pass
 
     def read_capabilities(self):
         """
@@ -93,7 +95,7 @@ class Core(object):
         # Get desired min & max
         for file_name, attr in files_map.items():
             try:
-                if attr == "epp":
+                if attr == "epp" and self.cpu.epp_enabled:
                     value = _read_sysfs(file_name)
                     if value not in self._epp_available:  # Ensure valid sysfs entry before setting
                         raise ValueError("Incorrect sysfs Entry")
@@ -179,6 +181,12 @@ class Core(object):
 
         def set_epp(self):
             """ Set energy performance preference """
+            # EPP may not be available
+            if not self.cpu.epp_enabled:
+                if self.epp is not None:
+                    raise ValueError("Cannot set epp to {}, EPP is not enabled"
+                                     .format(self.epp))
+                return
             if self.epp not in self._epp_available:
                 raise ValueError("Cannot set epp to %s, available options are %s" %
                                  (self.epp, self._epp_available))
@@ -236,6 +244,7 @@ class CPU(object):
         self.lowest_freq = None         # lowest active frequency
         self.uncore_hw_max = 2400       # max available uncore frequency
         self.uncore_hw_min = 1200       # min available uncore frequency
+        self.epp_enabled = False        # is EPP enabled in the BIOS
         self.power_consumption = None   # power consumption since last update
         self.tdp = None                 # max possible power consumption
         self.uncore_freq = None         # current uncore frequency
@@ -579,7 +588,6 @@ def _populate_cores_cpus():
             cpu_ids.append(physical_id)
             cpu_obj.physical_id = physical_id
             cpu_obj.read_capabilities(core)
-            cpu_obj.refresh_stats(core)
             CPUS.append(cpu_obj)
         else:
             cpu_idx = cpu_ids.index(physical_id)
@@ -588,7 +596,6 @@ def _populate_cores_cpus():
         # Create core object and initialize
         core_obj = Core(core, cpu_obj)
         core_obj.read_capabilities()
-        core_obj.refresh_stats()
 
         # Add core to CPU core_list
         cpu_obj.core_list.append(core_obj)
@@ -607,10 +614,39 @@ def _populate_cores_cpus():
 
     # Post core & cpu initialization, check if SST-BF is enabled and configured
     for cpu in CPUS:
+        # populate runtime data for CPU
+        cpu.refresh_stats()
         # if there's no sysfs base frequency, SST-BF is not supported
         if cpu.core_list[0].sst_bf_base_freq:
             cpu.sst_bf_enabled = _check_sst_bf_enabled(cpu)
             cpu.sst_bf_configured = _check_sst_bf_configured(cpu)
+        cpu.epp_enabled = _check_epp_enabled(cpu)
+        # reading core object stats was deferred until the last moment because
+        # it wasn't clear if EPP was supported
+        for core in cpu.core_list:
+            core.refresh_stats()
+
+
+def _check_epp_enabled(cpu_obj):
+    """
+    EPP is enabled if CPUID bits indicate support for EPP, and if there are
+    sysfs entries.
+    """
+    core_obj = cpu_obj.core_list[0]
+    core_id = core_obj.core_id
+    try:
+        cpuinfo_obj = cpuinfo.get_info_list()[core_id]
+    except (IOError, OSError):
+        # failed to read /proc/cpuinfo, assume EPP is not supported
+        return False
+
+    # if EPP bit in CPUID is not set, EPP is not supported
+    if "hwp_epp" not in cpuinfo_obj.flags:
+        return False
+
+    # EPP bit set, check if there are sysfs entries
+    return os.path.isfile(core_obj._epp_filename)
+
 
 def _check_sst_bf_configured(cpu_obj):
     """

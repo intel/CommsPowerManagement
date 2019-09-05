@@ -17,7 +17,7 @@ It is intended to be used to build various orchestration and platform power mana
     provides=["pwr"],
     url='https://github.com/intel/CommsPowerManagement',
     author='Intel Corporation',
-    packages=["pwr"],
+    packages=["pwr", "pwr.internal"],
     project_urls={
         "Bug Tracker": "https://github.com/intel/CommsPowerManagement/issues",
         "Documentation": "https://github.com/intel/CommsPowerManagement/blob/master/pwr.md",

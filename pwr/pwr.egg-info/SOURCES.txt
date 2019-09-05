@@ -5,3 +5,5 @@ pwr.egg-info/PKG-INFO
 pwr.egg-info/SOURCES.txt
 pwr.egg-info/dependency_links.txt
 pwr.egg-info/top_level.txt
+pwr/internal/__init__.py
+pwr/internal/cpuinfo.py
