@@ -1,5 +1,6 @@
-pwr.py
 setup.py
+pwr/__init__.py
+pwr/pwr.py
 pwr.egg-info/PKG-INFO
 pwr.egg-info/SOURCES.txt
 pwr.egg-info/dependency_links.txt
