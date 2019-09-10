@@ -17,6 +17,9 @@ MSR_IA32_MISC_ENABLES = 0x1A0
 MSR_IA32_PM_ENABLE = 0x770
 MSR_UNCORE_RATIO_LIMIT = 0x620
 MSR_UNCORE_PERF_STATUS = 0x621
+MSR_RAPL_POWER_UNIT = 0x606
+MSR_PKG_POWER_INFO = 0x614
+MSR_PKG_ENERGY_STATUS = 0x611
 BASE_PATH = "/sys/devices/system/cpu"
 BASE_POWERCAP_PATH = "/sys/devices/virtual/powercap/intel-rapl"
 
@@ -255,6 +258,8 @@ class CPU(object):
         self._prev_power_cons_ts = None   # timestamp for previous power consumption data
         self._prev_power_cons_val = None  # previous power consumption data
         self._power_cons_max = None       # wraparound power consumption value
+        self._power_cons_power_unit = None  # power unit as reported by MSR
+        self._power_cons_energy_unit = None  # energy unit as reported by MSR
 
     def read_capabilities(self, core=None):
         """
@@ -265,6 +270,27 @@ class CPU(object):
             core = self.core_list[0].core_id
 
         powercap_cpu_base = os.path.join(BASE_POWERCAP_PATH, "intel-rapl:{}".format(self.cpu_id))
+        power_cons_msr = not os.path.isdir(powercap_cpu_base)
+
+        def get_msr_power_units():
+            """ Get power and energy units from MSR_RAPL_POWER_UNIT """
+            regstr = _rdmsr(core, MSR_RAPL_POWER_UNIT)
+            # Unpack the 8 bytes into array of unsigned chars
+            data = struct.unpack('BBBBBBBB', regstr)
+
+            # power and energy units are first 4 bits of first two bytes
+            power_unit = data[0] & 0xF
+            energy_unit = data[1] & 0xF
+
+            return power_unit, energy_unit
+
+        def get_tdp_msr():
+            """ Get TDP from MSR_PKG_POWER_INFO """
+            regstr = _rdmsr(core, MSR_PKG_POWER_INFO)
+            # Unpack the 8 bytes into array of 16-bit values
+            data = struct.unpack('HHHH', regstr)
+
+            return data[0] & 0x3FFF  # first 14 bits
 
         def get_min_max_freq():
             """ Get package turbo frequency and lowest frequency """
@@ -319,15 +345,16 @@ class CPU(object):
             """ Get the max power consumption of CPU """
             try:
                 path = os.path.join(powercap_cpu_base, "max_energy_range_uj")
-                # leave it to be in uJ
                 cons_max = int(_read_sysfs(path))
+                # uJ to J
+                cons_max /= 1000000.0
             except (IOError, OSError) as err:
                 raise IOError("%s\nCould not read power consumption wraparound value" % err)
             except ValueError as err:
                 raise ValueError("%s\nCould not parse power consumption wraparound value" % err)
             return cons_max
 
-        def get_tdp():
+        def get_tdp_sysfs():
             """ Get max available power draw from CPU """
             try:
                 path = os.path.join(powercap_cpu_base, "constraint_0_power_limit_uw")
@@ -344,15 +371,30 @@ class CPU(object):
         self.hwp_enabled = check_hwp()
         self.turbo_enabled = check_turbo()
         self.all_core_turbo_freq = get_all_core_turbo()
-        self.tdp = get_tdp()
-        self._power_cons_max = get_max_power_consumption()
+        if power_cons_msr:
+            # read raw power units from MSR
+            power_unit, energy_unit = get_msr_power_units()
+
+            # units are in (1 / 2 ^ msr value)
+            self._power_cons_power_unit = 1.0 / (2.0 ** power_unit)
+            self._power_cons_energy_unit = 1.0 / (2.0 ** energy_unit)
+
+            self.tdp = get_tdp_msr() * self._power_cons_power_unit
+
+            # calculate register wraparound value in energy units - it's a
+            # 32-bit wide unsigned register, so it wraps around at 2 ^ 32
+            self._power_cons_max = (2 ** 32) * self._power_cons_energy_unit
+        else:
+            self.tdp = get_tdp_sysfs()
+            self._power_cons_max = get_max_power_consumption()
 
     # this isn't an inner function in refresh_stats because we need private state
-    def _get_avg_power_consumption(self):
+    def _get_avg_power_consumption(self, core):
         """ Get average power consumption since last check """
         powercap_cpu_base = os.path.join(BASE_POWERCAP_PATH, "intel-rapl:{}".format(self.cpu_id))
+        power_cons_msr = not os.path.isdir(powercap_cpu_base)
 
-        def get_power_consumption():
+        def get_power_consumption_sysfs():
             """ Get current power consumption """
             try:
                 path = os.path.join(powercap_cpu_base, "energy_uj")
@@ -363,10 +405,24 @@ class CPU(object):
                 raise IOError("%s\nCould not parse power consumption value" % err)
             return cons
 
+        def get_power_consumption_msr(core):
+            """ Get current power consumption from MSR """
+            regstr = _rdmsr(core, MSR_PKG_ENERGY_STATUS)
+            cur_cons, _ = struct.unpack('II', regstr)
+            return cur_cons
 
         # first, read current power consumption value and timestamp
         cur_ts = time.monotonic()
-        cur_cons = get_power_consumption()
+        if power_cons_msr:
+            # power consumption in energy units
+            cur_cons = get_power_consumption_msr(core)
+            # turn energy units to Joules
+            cur_cons *= self._power_cons_energy_unit
+        else:
+            # power consumption in uJ
+            cur_cons = get_power_consumption_sysfs()
+            # uJ to J
+            cur_cons /= 1000000.0
 
         # do we have a previous timestamp?
         prev_ts = self._prev_power_cons_ts
@@ -400,7 +456,7 @@ class CPU(object):
             cur_cons -= self._power_cons_max
 
         diff_ts = cur_ts - prev_ts
-        diff_cons = (cur_cons - prev_cons) / 1000000  #uJ to J
+        diff_cons = cur_cons - prev_cons
 
         # J / seconds gives us W
         res = diff_cons / diff_ts
@@ -435,7 +491,7 @@ class CPU(object):
         self.uncore_freq = get_current_uncore_freq()
         self.uncore_min_freq, self.uncore_max_freq = get_uncore_min_max()
         self.sst_bf_configured = _check_sst_bf_configured(self)
-        self.power_consumption = self._get_avg_power_consumption()
+        self.power_consumption = self._get_avg_power_consumption(core)
 
 
     def commit(self):
