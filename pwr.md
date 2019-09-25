@@ -4,6 +4,14 @@ This is a python module which allows an application to modify power attributes o
 frequency of the uncore, frequency profiles can be set to achieve desired performance, as well as that capabilities of a CPU can be obtained and its frequency and power consumption stats monitored.
 The library will provide a list of core and/or CPU objects whose attributes can be modified and committed to make changes on the CPU.
 
+# Prerequisites
+
+The module requires that hardware P-States are enabled in the BIOS and the intel_pstate performance scaling driver is used in the kernel.
+Specific features of the module can only be utilized as long as the underlying hardware/software has that capability. Minimum requirements for these features are as follows:
+
+* Intel(R) Speed Select Technology - Base Frequency (SST-BF): requires Linux kernel v5.1 or later, and a supported CPU (such as Intel(R) Xeon 6230N)
+
+
 # Installation
 
 The module can be installed with pip using the following command:
@@ -19,6 +27,7 @@ import pwr  # Import the module
 cores = pwr.get_cores()  # Create core object list
 cpus = pwr.get_cpus()  # Create CPU object list
 ```
+
 
 ## Adjusting Power Configuration
 ### Modifying
