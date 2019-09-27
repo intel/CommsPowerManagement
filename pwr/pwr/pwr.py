@@ -591,9 +591,9 @@ def _get_msr_driver():
     try:
         with open("/dev/cpu/0/msr", "r"):
             pass
-    except IOError:
-        raise IOError("MSR Driver not loaded\nRun 'modprobe msr'")
-    except OSError:
+    except (OSError, IOError) as e:
+        if e.errno == 13:  # EACCES
+            raise IOError("MSR Driver not accessible\nPlease run as 'root'.")
         raise IOError("MSR Driver not loaded\nRun 'modprobe msr'")
 
 def _get_scaling_driver():
