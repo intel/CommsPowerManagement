@@ -14,9 +14,15 @@ Specific features of the module can only be utilized as long as the underlying h
 
 # Installation
 
-The module can be installed with pip using the following command:
+The module can be installed with `pip` using the following command:
 
+```sh
 pip install "git+https://github.com/intel/CommsPowerManagement.git#egg=pwr&subdirectory=pwr"
+```
+
+If not running as a privileged user, the above should be prefixed with
+`sudo -H`. If the `pwr` module is to be used in Python3 environment, then the
+`pip` command should be replaced with `pip3`.
 
 ## Initialization
 Creation of the cpu and core object lists is done using the `get_cores()/get_cpus()` functions, which return a list of the respective objects.
