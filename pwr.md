@@ -4,15 +4,14 @@ This is a python module which allows an application to modify power attributes o
 frequency of the uncore, frequency profiles can be set to achieve desired performance, as well as that capabilities of a CPU can be obtained and its frequency and power consumption stats monitored.
 The library will provide a list of core and/or CPU objects whose attributes can be modified and committed to make changes on the CPU.
 
-# Prerequisites
+## Prerequisites
 
 The module requires that hardware P-States are enabled in the BIOS and the intel_pstate performance scaling driver is used in the kernel.
 Specific features of the module can only be utilized as long as the underlying hardware/software has that capability. Minimum requirements for these features are as follows:
 
 * Intel(R) Speed Select Technology - Base Frequency (SST-BF): requires Linux kernel v5.1 or later, and a supported CPU (such as Intel(R) Xeon 6230N)
 
-
-# Installation
+## Installation
 
 The module can be installed with `pip` using the following command:
 
@@ -25,6 +24,7 @@ If not running as a privileged user, the above should be prefixed with
 `pip` command should be replaced with `pip3`.
 
 ## Initialization
+
 Creation of the cpu and core object lists is done using the `get_cores()/get_cpus()` functions, which return a list of the respective objects.
 
 ```python
@@ -34,11 +34,14 @@ cores = pwr.get_cores()  # Create core object list
 cpus = pwr.get_cpus()  # Create CPU object list
 ```
 
-
 ## Adjusting Power Configuration
+
 ### Modifying
+
 Each cpu and core object have attributes which replicate the capabilities and stats of the physical cores and cpus.
+
 ### CPU
+
 * `cpu_id`                  # CPU id number
 * `physical_id`             # physical CPU number
 * `core_list`               # list of core objects on this CPU
@@ -59,6 +62,7 @@ Each cpu and core object have attributes which replicate the capabilities and st
 * `uncore_min_freq`         # min desired uncore frequency
 
 ### Core
+
 * `core_id`                 # logical core id number
 * `cpu`                     # this cores cpu object
 * `thread_siblings`         # list of other logical cores residing on same physical core
@@ -72,7 +76,8 @@ Each cpu and core object have attributes which replicate the capabilities and st
 * `min_freq`                # desired low frequency
 * `max_freq`                # desired high frequency
 * `epp`                     # energy performance preference
->Specific frequencies will depend on system and configuration.
+
+> NOTE: Specific frequencies will depend on system and configuration.
 
 Most of the Core/CPU object attributes are constant and cannot be changed. The only **Core** attributes that can be written to by the user, are `min_freq`, `max_freq` and `epp`.
 The only **CPU** object attributes which can be written to by the user, are `uncore_max_freq` and `uncore_min_freq`.
@@ -86,8 +91,10 @@ cpu.uncore_min_freq = cpu.uncore_hw_min  # Set the desired minimum uncore freque
 ```
 
 ### Committing
+
 Modification of the power settings of a system is done by altering the core or CPU characteristics, as shown above,
 then finalizing with the `commit()` function call.
+
 ```python
 cores = pwr.get_cores()  # Create the cores object list
 
@@ -97,9 +104,10 @@ for core in cores:  # Loop through core objects in list
     core.commit()  # Commit changes to be made on system
 ```
 
-
 ### Pre-set Profiles
+
 When an application is modifying the desired min and max core frequencies, pre-set configurations can also be applied, these will overwrite current configurations and commit the pre-sets.
+
 * `minimum`:            Set all cores minimum to 800Mhz and maximum to 800Mhz.
 * `maximum`:            Set all cores minimum to 3900Mhz and maximum to 3900Mhz.
 * `base`:               Set all cores minimum to 2300Mhz and maximum to 2300Mhz.
@@ -108,29 +116,38 @@ When an application is modifying the desired min and max core frequencies, pre-s
 * `sst_bf_base`:        Set high priority cores minimum and maximum to 2700Mhz, normal priority cores minimum and maximum to 2100Mhz (Only available with SST-BF).
 * `sst_bf_high_turbo`:  Set high priority cores minimum to 2700Mhz and maximum to 3900Mhz, normal priority cores minimum to 800Mhz and maximum to 2100Mhz(Only available with SST-BF).
 * `sst_bf_low_turbo`:   Set high priority cores minimum to 2700Mhz and maximum to 2700Mhz, normal priority cores minimum to 800Mhz and maximum to 3900Mhz(Only available with SST-BF).
->Specific frequencies will depend on system and configuration.
+
+> NOTE: Specific frequencies will depend on system and configuration.
 
 ```python
 For c in cores:
     c.commit("sst_bf_base") # Configure cores with the SST-BF configuration
 ```
+
 ## Concept Overview
-### CPU
+
+### CPU Objects
+
 A CPU may have multiple physical cores, which are represented by the core objects. These cores can optionally have multiple threads, which means there would be multiple logical cores on a single physical core, these are called thread siblings. Each logical core will also have its own core object. Uncore frequency is the frequency at which everything on the CPU, except the cores, runs at. This can be scaled within the limits of min and max.
-### Core
+
+### Core Objects
+
 Each core's frequency can scaled up or down, in the case of multiple logical cores on a physical core, both logical cores must have the same frequency for the physical core to operate at that frequency. Core frequencies can be set up to utilize the SST-BF configuration, if available. Energy performance profiles can be set up on a per core basis using a specific EPP policy, if the system configuration allows.
 
-## Refreshing cpu stats
+## Refreshing CPU stats
+
 CPU stats can become out of date, such as `curr_freq` or `sst_bf_configured`. These can be refreshed in with `refresh_stats()`.
 It is *advised* that CPU and core objects be updated with `refresh_stats()` before requesting object data.
 
 core.refresh_stats() will update:
+
 * `curr_freq`
 * `min_freq`
 * `max_freq`
 * `epp`
 
 cpu.refresh_stats() will update:
+
 * `uncore_freq`
 * `uncore_max_freq`
 * `uncore_min_freq`
@@ -145,6 +162,7 @@ for c in cores:
 ```
 
 ## Object Referencing
+
 Both CPU & core objects reference each other, the list of core objects can be accessed through the CPU and the CPU object of a core can be accessed through a core.
 
 ```python
@@ -155,7 +173,9 @@ for core in cores:  # Loop through cores in object list
             core.max_freq = core.sst_bf_base_freq  # Modify maximum desired frequency
             core.commit()  # Commit changes to hardware
 ```
+
 or
+
 ```python
 for cpu in cpus:
     if cpu.core_list[0].epp == "performance":  # Access core performance profile through core list of CPU object
@@ -165,7 +185,9 @@ for cpu in cpus:
 ```
 
 ## EPP
+
 The EPP value (`epp` attribute in the `Core` object) uses SST-CP technology to prioritize core power consumption. Available EPP values are:
+
 * "performance" (maximum power consumption priority)
 * "balance_performance" (default power consumption priority)
 * "balance_power" (lower power consumption priority)
@@ -174,4 +196,5 @@ The EPP value (`epp` attribute in the `Core` object) uses SST-CP technology to p
 For more information about EPP, see relevant product manuals' section describing the SST-CP technology.
 
 ## Power Consumption
+
 The power consumption of the CPU can be read from the `power_consumption` attribute, this value can be compared against the `tdp` value to check is the current power draw close to the limit, indicated by the tdp value. The power consumption is reported as average since last time it was calculated. The first time this value is read, it can be 0. The next time it is read, it will show average power consumption (in Watts) since last read. Time period between reads must not exceed 60 seconds, otherwise the value will be reset to 0.
