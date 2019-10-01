@@ -497,8 +497,8 @@ class CPU(object):
     def commit(self):
         """ Update package wide MSRs with cpu object attributes """
         if self.uncore_min_freq > self.uncore_max_freq:
-            raise("Cannot update uncore freq, desired min(%s) greater than desired max(%s)" %
-                  (str(self.uncore_min_freq), str(self.uncore_max_freq)))
+            raise ValueError("Cannot update uncore freq, desired min({}) greater than desired max({})"
+                  .format(self.uncore_min_freq, self.uncore_max_freq))
         # Read all msr data as to not overwrite other MSR data on write
         read_regstr = _rdmsr(self.core_list[0].core_id, MSR_UNCORE_RATIO_LIMIT)
         data = struct.unpack('BBBBBBBB', read_regstr)
