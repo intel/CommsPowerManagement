@@ -29,7 +29,7 @@ MSR_FILE = "/dev/cpu/0/msr"
 
 CPU_COUNT = 0
 ONLINE_CORES = []
-SCRIPT_VERSION = "1.2n"
+SCRIPT_VERSION = "1.3"
 
 # Read a 64-byte value from an MSR through the sysfs interface.
 # Returns an 8-byte binary packed string.
@@ -282,20 +282,6 @@ def set_sst_bf(mode):
         elif mode == 1:
             set_min_cpu_freq(FREQ_P1*1000, core)
             set_max_cpu_freq(FREQ_P1*1000, core)
-        elif mode == 2:
-            if base > FREQ_P1:
-                set_min_cpu_freq(base*1000, core)
-                set_max_cpu_freq(FREQ_P0*1000, core)
-            else:
-                set_min_cpu_freq(FREQ_P1N*1000, core)
-                set_max_cpu_freq(base*1000, core)
-        elif mode == 3:
-            if base > FREQ_P1:
-                set_min_cpu_freq(base*1000, core)
-                set_max_cpu_freq(base*1000, core)
-            else:
-                set_min_cpu_freq(FREQ_P1N*1000, core)
-                set_max_cpu_freq(FREQ_P0*1000, core)
 
     query_sst_bf()
 
@@ -311,21 +297,6 @@ def reverse_sst_bf():
         minimum = get_cpu_min_frequency(core)
         set_min_cpu_freq(minimum, core)
 
-    query_sst_bf()
-
-def reverse_sst_bf_to_p1():
-    """"Reverse frequencies to non-turbo."""
-
-    print("CPU Count = " + str(CPU_COUNT))
-
-    freq_p1 = get_cpu_base_frequency()
-
-    for core in ONLINE_CORES:
-        maximum = get_cpu_max_frequency(core)
-        set_max_cpu_freq(maximum, core)
-        minimum = get_cpu_min_frequency(core)
-        set_min_cpu_freq(minimum, core)
-        set_max_cpu_freq(freq_p1*1000, core)
     query_sst_bf()
 
 def sst_bf_enabled():
@@ -438,9 +409,6 @@ def __print_help():
     __print_wrap('s', HELP_TEXT_S_LONG)
     __print_wrap('m', HELP_TEXT_M_LONG)
     __print_wrap('r', HELP_TEXT_R_LONG)
-    __print_wrap('t', HELP_TEXT_T_LONG)
-    __print_wrap('a', HELP_TEXT_A_LONG)
-    __print_wrap('b', HELP_TEXT_B_LONG)
     print("[i] %s" % HELP_TEXT_I)
     print("[l] %s" % HELP_TEXT_L)
     print("[n] %s" % HELP_TEXT_N)
@@ -465,9 +433,6 @@ def do_menu():
     print("[s] %s" % HELP_TEXT_S)
     print("[m] %s" % HELP_TEXT_M)
     print("[r] %s" % HELP_TEXT_R)
-    print("[t] %s" % HELP_TEXT_T)
-    print("[a] %s" % HELP_TEXT_A)
-    print("[b] %s" % HELP_TEXT_B)
     print("[i] %s" % HELP_TEXT_I)
     print("[l] %s" % HELP_TEXT_L)
     print("[n] %s" % HELP_TEXT_N)
@@ -484,12 +449,6 @@ def do_menu():
         set_sst_bf(1)
     elif text == "r":
         reverse_sst_bf()
-    elif text == "t":
-        reverse_sst_bf_to_p1()
-    elif text == "a":
-        set_sst_bf(2)
-    elif text == "b":
-        set_sst_bf(3)
     elif text == "i":
         query_sst_bf()
     elif text == "l":
@@ -591,43 +550,6 @@ HELP_TEXT_R_LONG = "Revert cores to minimum/Turbo. Set all cores to %s" \
        str(FREQ_P0))
 PARSER.add_argument('-r', action="store_true", help=HELP_TEXT_R_LONG)
 
-HELP_TEXT_T = "Revert cores to min/P1 (set min/max to %s/%s)" % \
-      (str(FREQ_P1N),
-       str(FREQ_P1))
-HELP_TEXT_T_LONG = "Revert cores to minimum/P1. Set all cores to %s" \
-      " minimum and %s maximum." % \
-      (str(FREQ_P1N),
-       str(FREQ_P1))
-PARSER.add_argument('-t', action="store_true", help=HELP_TEXT_T_LONG)
-
-HELP_TEXT_A = "Mixed config A (set min/max to %s/%s and %s/%s)" % \
-      (str(FREQ_P1_HIGH),
-       str(FREQ_P0),
-       str(FREQ_P1N),
-       str(FREQ_P1_NORMAL))
-HELP_TEXT_A_LONG = "Mixed config A. Set high priority cores to %s" \
-      " minimum and %s maximum, and set normal priority" \
-      " cores to %s minimum and %s maximum." % \
-      (str(FREQ_P1_HIGH),
-       str(FREQ_P0),
-       str(FREQ_P1N),
-       str(FREQ_P1_NORMAL))
-PARSER.add_argument('-a', action="store_true", help=HELP_TEXT_A_LONG)
-
-HELP_TEXT_B = "Mixed config B (set min/max to %s/%s and %s/%s)" % \
-      (str(FREQ_P1_HIGH),
-       str(FREQ_P1_HIGH),
-       str(FREQ_P1N),
-       str(FREQ_P0))
-HELP_TEXT_B_LONG = "Mixed config B. Set high priority cores to %s" \
-      " minimum and %s maximum, and set normal priority" \
-      " cores to %s minimum and %s maximum." % \
-      (str(FREQ_P1_HIGH),
-       str(FREQ_P1_HIGH),
-       str(FREQ_P1N),
-       str(FREQ_P0))
-PARSER.add_argument('-b', action="store_true", help=HELP_TEXT_B_LONG)
-
 HELP_TEXT_I = "Show current SST-BF frequency information"
 PARSER.add_argument('-i', action="store_true", help=HELP_TEXT_I)
 
@@ -655,15 +577,6 @@ if ARGS.m:
     sys.exit(0)
 if ARGS.r:
     reverse_sst_bf()
-    sys.exit(0)
-if ARGS.t:
-    reverse_sst_bf_to_p1()
-    sys.exit(0)
-if ARGS.a:
-    set_sst_bf(2)
-    sys.exit(0)
-if ARGS.b:
-    set_sst_bf(3)
     sys.exit(0)
 if ARGS.i:
     query_sst_bf()
