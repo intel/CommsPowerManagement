@@ -437,7 +437,7 @@ class CPU(object):
                 prev_cons = None
             # in Python 2 we won't be using a monotonic clock so we're susceptible to timezone
             # changes, so also check for negative time
-            if cur_ts < prev_ts:
+            elif cur_ts < prev_ts:
                 prev_ts = None
                 prev_cons = None
 
