@@ -39,15 +39,9 @@ presented with help text (frequencies may vary for different CPUs):
 
 [-r] This option reverts the CPU to and out of the box configuration where Intel Turbo Boost is enabled (up to max turbo frequency). SST-BF depends on Turbo and P states enabled in BIOS. The range of frequency is lowest P state to highest Turbo frequency. Hence, this is considered the starting configuraiton. The script includes this to allow the user easily revert to the coinfiguraion at boot time prior to SST-BF[-s] or P1 set on all cores[-m]
 
-[-t] This options set the CPU to and out of the box configuration where Intel Turbo Boost is disabled (P1 max core frequency).
-
-[-a] Allows high priority cores to Turbo up to max all core turbo. Performance gains are opportunistic as CPU is operating in Turbo range. Hence, not recommended as a deterministic configuraiton option.
-
-[-b] Allows normal priority cores to Turbo up to max all core turbo. Performance gains are opportunistic as CPU is operating in Turbo range. Hence, not recommended as a deterministic configuraiton option.
-
 ```bash
 # sst_bf.py -h
-usage: sst_bf.py [-h] [-s] [-m] [-r] [-t] [-a] [-b] [-i] [-l] [-v]
+usage: sst_bf.py [-h] [-s] [-m] [-r] [-i] [-l] [-v]
 
 Configure SST-BF frequencies
 
@@ -60,14 +54,6 @@ optional arguments:
               maximum.
   -r          Revert cores to minimum/Turbo. Set all cores to 800 minimum and
               3900 maximum.
-  -t          Revert cores to minimum/P1. Set all cores to 800 minimum and
-              2300 maximum.
-  -a          Mixed config A. Set high priority cores to 2700 minimum and 3900
-              maximum, and set normal priority cores to 800 minimum and 2100
-              maximum.
-  -b          Mixed config B. Set high priority cores to 2700 minimum and 2700
-              maximum, and set normal priority cores to 800 minimum and 3900
-              maximum.
   -i          Show current SST-BF frequency information
   -l          List High Priority cores
   -v          Show script version
@@ -82,9 +68,6 @@ presented with the following menu (frequencies may vary for different CPUs):
 [s] Set SST-BF config (set min/max to 2700/2700 and 2100/2100)
 [m] Set P1 on all cores (set min/max to 2300/2300)
 [r] Revert cores to min/Turbo (set min/max to 800/3900)
-[t] Revert cores to min/P1 (set min/max to 800/2300)
-[a] Mixed config A (set min/max to 2700/3900 and 800/2100)
-[b] Mixed config B (set min/max to 2700/2700 and 800/3900)
 [i] Show current SST-BF frequency information
 [l] List High Priority cores
 [v] Show script version
@@ -179,19 +162,6 @@ We have 12 high priority cores according to sysfs base_frequency.
 
 Press enter to continue ...
 ```
-
-The two remaining options, 'Mixed config A' and 'Mixed config B' allow a
-mix of standard SST-BF and non-SST-BF configuration . These configurations
-may be suitable for some use-cases.
-
-For 'Mixed Config A', the high priority cores are set to 2700 minimum and
-3900 maximum, and set normal priority cores to 800 minimum and 2100
-maximum.
-
-For 'Mixed Config B', the high priority cores are set to 2700 minimum and
-2700 maximum, and set normal priority cores to 800 minimum and 3900s
-maximum.
-
 # Emulating SST-BF
 
 If a suitable BIOS or Linux kernel is not available on the platform, SST-BF
