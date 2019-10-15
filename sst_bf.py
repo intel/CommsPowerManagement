@@ -497,7 +497,8 @@ ONLINE_CORES = list(filter(__is_online, range(0, CPU_COUNT)))
 FREQ_P1 = get_cpu_base_frequency()
 BASE = get_sst_bf_frequency(0)
 if BASE == FREQ_P1:
-    print("base_frequency not available in %s" % BASE_FILE)
+    print("ERROR: No High Priority cores found. Is SST-BF enabled in BIOS?")
+    print("       (base_frequency equals p1 frequency)")
     sys.exit(-1)
 
 if not sst_bf_enabled():
