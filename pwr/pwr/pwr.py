@@ -656,6 +656,10 @@ def _populate_cores_cpus():
         # Add core to CPU core_list
         cpu_obj.core_list.append(core_obj)
 
+        # if there is no base_frequency sysfs entry, just set sst_bf_base_freq
+        # to whatever base frequency we have read from MSR
+        if not core_obj.sst_bf_base_freq:
+            core_obj.sst_bf_base_freq = core_obj.base_freq
         # Check if core is high priority, depending on base frequency
         if core_obj.sst_bf_base_freq > core_obj.base_freq:
             core_obj.high_priority = True
@@ -672,10 +676,8 @@ def _populate_cores_cpus():
     for cpu in CPUS:
         # populate runtime data for CPU
         cpu.refresh_stats()
-        # if there's no sysfs base frequency, SST-BF is not supported
-        if cpu.core_list[0].sst_bf_base_freq:
-            cpu.sst_bf_enabled = _check_sst_bf_enabled(cpu)
-            cpu.sst_bf_configured = _check_sst_bf_configured(cpu)
+        cpu.sst_bf_enabled = _check_sst_bf_enabled(cpu)
+        cpu.sst_bf_configured = _check_sst_bf_configured(cpu)
         cpu.epp_enabled = _check_epp_enabled(cpu)
         # reading core object stats was deferred until the last moment because
         # it wasn't clear if EPP was supported
