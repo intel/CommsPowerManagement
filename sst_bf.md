@@ -41,7 +41,7 @@ presented with help text (frequencies may vary for different CPUs):
 
 ```bash
 # sst_bf.py -h
-usage: sst_bf.py [-h] [-s] [-m] [-r] [-i] [-l] [-v]
+usage: sst_bf.py [-h] [-s] [-m] [-r] [-i] [-l] [-n] [-v]
 
 Configure SST-BF frequencies
 
@@ -56,6 +56,7 @@ optional arguments:
               3900 maximum.
   -i          Show current SST-BF frequency information
   -l          List High Priority cores
+  -n          List Normal Priority cores
   -v          Show script version
 #
 ```
@@ -70,6 +71,7 @@ presented with the following menu (frequencies may vary for different CPUs):
 [r] Revert cores to min/Turbo (set min/max to 800/3900)
 [i] Show current SST-BF frequency information
 [l] List High Priority cores
+[n] List Normal Priority cores
 [v] Show script version
 [h] Print additional help on menu options
 
@@ -78,8 +80,8 @@ presented with the following menu (frequencies may vary for different CPUs):
 Option:
 ```
 
-Options i, l and v give information about the current system configuraion,
-including a list of high priority cores (including a hexadecimal coremask),
+Options i, l, n and v give information about the current system configuraion,
+including a list of normal and high priority cores (including a hexadecimal coremask),
 and the version of the script.
 
 
@@ -104,7 +106,7 @@ We have 12 high priority cores according to sysfs base_frequency.
 Press enter to continue ...
 ```
 
-And the List option, with it's comma-separated list and hexadecimal core mask
+The List (high priority cores) option, with it's comma-separated list and hexadecimal core mask
 of high priority cores:
 
 [l] List High Priority cores
@@ -112,6 +114,18 @@ of high priority cores:
 Option: l
 1,6,7,8,9,16,21,26,27,28,29,30
 0x7c2103c2
+
+Press enter to continue ...
+```
+
+And the List (normal priority cores) option, with it's comma-separated list and hexadecimal core mask
+of normal priority cores:
+
+[n] List Normal Priority cores
+```bash
+Option: n
+0,2,3,4,5,10,11,12,13,14,15,17,18,19,20,22,23,24,25,31,32,33,34,35,36,37,38,39
+0xff83defc3d
 
 Press enter to continue ...
 ```
