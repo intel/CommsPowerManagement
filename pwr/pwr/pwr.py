@@ -56,6 +56,7 @@ class Core(object):
         self.min_freq = None                                # desired low frequency
         self.max_freq = None                                # desired high frequency
         self.epp = None                                     # energy performance preference
+        self.cstates = None                                 # dict of c-states
 
         self._epp_available = []
         self._cpu_name = "cpu{}".format(self.core_id)
@@ -78,6 +79,18 @@ class Core(object):
         except (IOError, OSError):
             # EPP is not available
             pass
+
+        self._idle_filename = os.path.join(
+            BASE_PATH, self._cpu_name, "cpuidle")
+        try:
+            cstate_fnames = os.listdir(os.path.join(self._idle_filename))
+        except IOError as err:
+            raise IOError(
+                "{}\nCould not read from cpuidle directory".format(err))
+        self._states_name_map = {
+            fnames: _read_sysfs(os.path.join(self._idle_filename, fnames, "name"))
+            for fnames in cstate_fnames
+        }
 
     def _read_capabilities(self):
         """
@@ -165,11 +178,23 @@ class Core(object):
                 # File not found, core is online, proceed with setup
                 return True
 
+        def get_cstates():
+            """ Get available C-states enabled/disabled state """
+            c_states = {}
+            for state, cstate_name in self._states_name_map.items():
+                disabled_fname = os.path.join(
+                    self._idle_filename, state, "disable")
+                disabled_flag = not bool(_read_sysfs(disabled_fname))
+                c_states[cstate_name] = disabled_flag
+
+            return c_states
+
         self.min_freq = get_desired_min_freq()
         self.max_freq = get_desired_max_freq()
         self.epp = get_desired_epp()
         self.curr_freq = get_curr_freq()
         self.online = check_core_online()
+        self.cstates = get_cstates()
 
     def commit(self, profile=""):
         """ Update sysfs entries for min/max/epp with core instance attributes """
@@ -234,6 +259,14 @@ class Core(object):
             if self.epp == "default":
                 self.epp = _read_sysfs(self._epp_filename)
 
+        def set_cstates(self):
+            """ Set C-states to enabled/disabled state """
+            # Check core attribute and write to relevant sysfs
+            for state, name in self._states_name_map.items():
+                disable = int(not self.cstates[name])
+                _write_sysfs(os.path.join(
+                    self._idle_filename, state, "disable"), disable)
+
         valid_range = [v for v in range(
             self.lowest_freq, self.highest_freq + 100, 100)]
 
@@ -261,6 +294,12 @@ class Core(object):
             set_epp(self)
         except (IOError, OSError) as err:
             raise IOError("{}\nCannot update epp on core {}"
+                          .format(err, self.core_id))
+
+        try:
+            set_cstates(self)
+        except (IOError, OSError) as err:
+            raise IOError("{}\nCannot update C-states on core {}"
                           .format(err, self.core_id))
 
 
@@ -408,8 +447,6 @@ class CPU(object):
                 raise ValueError("{}\nCould not parse TDP value".format(err))
             return tdp
 
-        
-        
         self.lowest_freq, self.highest_freq = get_min_max_freq()
         self.base_freq = get_base_freq()
         self.hwp_enabled = check_hwp()
@@ -588,7 +625,7 @@ class System(object):
             """ Ensure frequencies are valid """
             valid_range = [v for v in range(
                 self.cpu_list[0].lowest_freq, self.cpu_list[0].highest_freq + 100, 100)]
-            if  core.min_freq > core.max_freq:
+            if core.min_freq > core.max_freq:
                 raise ValueError("Invalid config, desired min freq({}) "
                                  "is greater than desired max freq({})" .format(core.min_freq, core.max_freq))
             elif core.min_freq not in valid_range or core.max_freq not in valid_range:
@@ -601,7 +638,7 @@ class System(object):
             if not cpus:
                 cpus = self.cpu_list
             cores = [c for cpu in cpus for c in cpu.core_list]
-   
+
             # Check for SST-BF configuration
             if self.sst_bf_enabled:
                 for core in cores:
@@ -622,9 +659,10 @@ class System(object):
             return True
 
         if cpus:
-            if type(cpus) != list: # User passes single CPU Object
+            if type(cpus) != list:  # User passes single CPU Object
                 cpus = [cpus]
-            if not all([isinstance(c, CPU) for c in cpus]): # Ensure list only contains CPU objects
+            # Ensure list only contains CPU objects
+            if not all(isinstance(c, CPU) for c in cpus):
                 raise ValueError("Invalid CPU object passed")
         return(test_current_config(cpus))
 
@@ -680,14 +718,14 @@ class System(object):
                     cpu.sst_bf_configured = False
                     continue
                 # assume configured unless we find otherwise
-                
+
                 for core in cpu.core_list:
                     target = set([core.sst_bf_base_freq])
                     if set([core.min_freq, core.max_freq]) != target:
                         cpu.sst_bf_configured = False
                         break
                 else:
-                    cpu.sst_bf_configured = True         
+                    cpu.sst_bf_configured = True
             results = [cpu.sst_bf_configured for cpu in self.cpu_list]
             self.sst_bf_configured = False not in results
 
@@ -863,7 +901,7 @@ def _populate_cores_cpus():
 
         # Create system object
         SYSTEM = System()
-      
+
         # Add core object to core list
         CORES.append(core_obj)
 

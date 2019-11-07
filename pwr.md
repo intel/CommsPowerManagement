@@ -95,6 +95,7 @@ Each system, cpu and core object have attributes which replicate the capabilitie
 * `min_freq`                # desired low frequency
 * `max_freq`                # desired high frequency
 * `epp`                     # energy performance preference
+* `cstates`                 # dict of C-states
 
 > NOTE: Specific frequencies will depend on system and configuration.
 
@@ -162,7 +163,7 @@ A CPU may have multiple physical cores, which are represented by the core object
 
 ### Core Objects
 
-Each core's frequency can scaled up or down, in the case of multiple logical cores on a physical core, both logical cores must have the same frequency for the physical core to operate at that frequency. Core frequencies can be set up to utilize the SST-BF configuration, if available. Energy performance profiles can be set up on a per core basis using a specific EPP policy, if the system configuration allows.
+Each core's frequency can be scaled up or down to particular frequencies (P-states). P-states may include P0 (Turbo Frequency), P1 (Base Freqeuncy) with as many frequency steps as the CPU provides, with a larger the P-state number indicating lower core operating frequency. A core can also be put into idle/sleep states, C-states, by the OS when it is not busy. C-states follow the same pattern as P-states where larger numbered C-states consume less power. Available P-states and C-states will depend on system configuration and CPU model. In the case of multiple logical cores on a physical core, the P-states and C-states are shared and must be configured the same for desired changes to take effect. Core frequencies can be set up to utilize the SST-BF configuration, if available. Energy performance profiles can be set up on a per core basis using a specific EPP policy, if the system configuration allows.
 
 ## Refreshing CPU stats
 
@@ -176,6 +177,7 @@ core.refresh_stats() will update:
 * `max_freq`
 * `epp`
 * `online`
+* `cstates`
 
 cpu.refresh_stats() will update:
 
@@ -194,6 +196,7 @@ system.refresh_all() will update all of the above object attributes:
 * `max_freq`
 * `epp`
 * `online`
+* `cstates`
 * `uncore_freq`
 * `uncore_max_freq`
 * `uncore_min_freq`
@@ -230,6 +233,23 @@ For more information about EPP, see relevant product manuals' section describing
 ## Power Consumption
 
 The power consumption of the CPU can be read from the `power_consumption` attribute, this value can be compared against the `tdp` value to check is the current power draw close to the limit, indicated by the tdp value. The power consumption is reported as average since last time it was calculated. The first time this value is read, it can be 0. The next time it is read, it will show average power consumption (in Watts) since last read. Time period between reads must not exceed 60 seconds, otherwise the value will be reset to 0.
+
+## C-States Configuration
+
+Any C-states permitted by the BIOS can be enabled/disabled by the pwr library. A cores' current c-state configuration can be checked and is stored in `core.cstates` dict.
+```python
+cstates = { 'C6': True,
+            'C1': True,
+            'C1E': True,
+            'POLL': True}
+```
+ C-State configuration can be modified by writing True/False to corresponding dict value, to enable/disable respectively, then committing. 
+```python
+for core in cores:
+    core.cstates["C1"] = True  # Enabling C1
+    core.cstates["C6"] = False  # Disabling C6
+    core.commit()
+```
 
 ## Request Configuration
 
