@@ -42,21 +42,21 @@ class Core(object):
 
     def __init__(self, id_num, cpu):
         """ Core object constructure """
-        self.core_id = id_num                               # core id number
-        self.online = False                                 # core availability flag
-        self.cpu = cpu                                      # this cores cpu object
-        self.thread_siblings = None                         # list of thread siblings
-        self.high_priority = False                          # high/low priority
-        self.base_freq = None                               # base freqeuncy
-        self.sst_bf_base_freq = None                        # priority based frequency
-        self.all_core_turbo_freq = None                     # all core turbo frequency
-        self.highest_freq = None                            # single core turbo frequency
-        self.lowest_freq = None                             # lowest active frequency
-        self.curr_freq = None                               # current core frequency
-        self.min_freq = None                                # desired low frequency
-        self.max_freq = None                                # desired high frequency
-        self.epp = None                                     # energy performance preference
-        self.cstates = None                                 # dict of c-states
+        self.core_id = id_num               # core id number
+        self.online = False                 # core availability flag
+        self.cpu = cpu                      # this cores cpu object
+        self.thread_siblings = None         # list of thread siblings
+        self.high_priority = False          # high/low priority
+        self.base_freq = None               # base freqeuncy
+        self.sst_bf_base_freq = None        # priority based frequency
+        self.all_core_turbo_freq = None     # all core turbo frequency
+        self.highest_freq = None            # single core turbo frequency
+        self.lowest_freq = None             # lowest active frequency
+        self.curr_freq = None               # current core frequency
+        self.min_freq = None                # desired low frequency
+        self.max_freq = None                # desired high frequency
+        self.epp = None                     # energy performance preference
+        self.cstates = None                 # dict of c-states
 
         self._epp_available = []
         self._cpu_name = "cpu{}".format(self.core_id)
@@ -191,13 +191,17 @@ class Core(object):
 
         self.min_freq = get_desired_min_freq()
         self.max_freq = get_desired_max_freq()
+        self.cstates = get_cstates()
+        self.online = check_core_online()
+        if not self.online:
+            return
         self.epp = get_desired_epp()
         self.curr_freq = get_curr_freq()
-        self.online = check_core_online()
-        self.cstates = get_cstates()
 
     def commit(self, profile=""):
         """ Update sysfs entries for min/max/epp with core instance attributes """
+        if not self.online:
+            return
         core_profiles = ["minimum", "maximum", "base", "default", "no_turbo"]
 
         if self.cpu.sys.sst_bf_enabled:
@@ -287,18 +291,24 @@ class Core(object):
         try:
             set_min_max_freq(self)
         except (IOError, OSError) as err:
+            if err.errno == 16 or 22:  # Change in core offline/online status mid flight
+                return  # skip core
             raise IOError("{}\nCannot update min/max freq on core {}"
                           .format(err, self.core_id))
 
         try:
             set_epp(self)
         except (IOError, OSError) as err:
+            if err.errno == 16 or 22:  # Change in core offline/online status mid flight
+                return  # skip core
             raise IOError("{}\nCannot update epp on core {}"
                           .format(err, self.core_id))
 
         try:
             set_cstates(self)
         except (IOError, OSError) as err:
+            if err.errno == 16 or 22:  # Change in core offline/online status mid flight
+                return  # skip core
             raise IOError("{}\nCannot update C-states on core {}"
                           .format(err, self.core_id))
 
@@ -311,25 +321,25 @@ class CPU(object):
 
     def __init__(self):
         """ CPU object Constructor """
-        self.cpu_id = None              # CPU id number
-        self.physical_id = None         # physical cpu number
-        self.core_list = []             # list of core objects on this CPU
-        self.sys = SYSTEM               # system object
-        self.turbo_enabled = False      # turbo enabled flag
-        self.hwp_enabled = False        # HWP enabled flag
-        self.sst_bf_configured = False  # cpu cores min&max set to sst_bf base frequency
-        self.base_freq = None           # base frequency
-        self.all_core_turbo_freq = None # all core turbo frequency
-        self.highest_freq = None        # single core turbo frequency
-        self.lowest_freq = None         # lowest active frequency
-        self.uncore_hw_max = 2400       # max available uncore frequency
-        self.uncore_hw_min = 1200       # min available uncore frequency
-        self.power_consumption = None   # power consumption since last update
-        self.tdp = None                 # max possible power consumption
-        self.freq_budget = None         # Frequency budget for stable performance
-        self.uncore_freq = None         # current uncore frequency
-        self.uncore_max_freq = None     # max desired uncore frequency
-        self.uncore_min_freq = None     # min desired uncore frequency
+        self.cpu_id = None                  # CPU id number
+        self.physical_id = None             # physical cpu number
+        self.core_list = []                 # list of core objects on this CPU
+        self.sys = SYSTEM                   # system object
+        self.turbo_enabled = False          # turbo enabled flag
+        self.hwp_enabled = False            # HWP enabled flag
+        self.sst_bf_configured = False      # cpu cores set to sst_bf config
+        self.base_freq = None               # base frequency
+        self.all_core_turbo_freq = None     # all core turbo frequency
+        self.highest_freq = None            # single core turbo frequency
+        self.lowest_freq = None             # lowest active frequency
+        self.uncore_hw_max = 2400           # max available uncore frequency
+        self.uncore_hw_min = 1200           # min available uncore frequency
+        self.power_consumption = None       # power consumption since last update
+        self.tdp = None                     # max possible power consumption
+        self.freq_budget = None             # Frequency budget for stable performance
+        self.uncore_freq = None             # current uncore frequency
+        self.uncore_max_freq = None         # max desired uncore frequency
+        self.uncore_min_freq = None         # min desired uncore frequency
 
         # private power consumption-related data
         self._prev_power_cons_ts = None   # timestamp for previous power consumption data
@@ -610,10 +620,10 @@ class System(object):
 
     def __init__(self):
         """ SYSTEM object Constructor """
-        self.cpu_list = CPUS            # list of CPU objects on the system
-        self.sst_bf_enabled = False     # base frequency enabled in BIOS
-        self.sst_bf_configured = False  # all system cores min&max set to sst_bf base frequency
-        self.epp_enabled = None         # epp enabled flag
+        self.cpu_list = CPUS                # list of CPU objects on the system
+        self.sst_bf_enabled = False         # base frequency enabled in BIOS
+        self.sst_bf_configured = False      # all cores set to sst_bf config
+        self.epp_enabled = None             # epp enabled flag
 
     def request_config(self, cpus=None):
         """
@@ -865,10 +875,18 @@ def _populate_cores_cpus():
         file_path = os.path.join(BASE_PATH, "cpu{}".format(core),
                                  "topology/physical_package_id")
         try:
+            with open(os.path.join(BASE_PATH, "cpu{}".format(core), "online")) as online_file:
+                core_online = bool(int(online_file.readline()))
+        except IOError:
+                # File not found, core is online, proceed with setup
+            core_online = True
+        try:
             with open(file_path) as package_file:
                 physical_id = int(package_file.read())
         except (IOError, OSError) as err:
-            raise Exception("{}\nCould not read cores physical ID".format(err))
+            if core_online:  # Check if failure due to core offline
+                raise Exception(
+                    "{}\nCould not read cores physical ID".format(err))
 
         # Get siblings of each core
         file_path = os.path.join(BASE_PATH, "cpu{}".format(core),
@@ -880,7 +898,9 @@ def _populate_cores_cpus():
                 # remove self from list
                 siblings.remove(core)
         except (IOError, OSError) as err:
-            raise Exception("{}\nCould not read thread siblings".format(err))
+            if core_online:  # Check if failure due to core offline
+                raise Exception(
+                    "{}\nCould not read thread siblings".format(err))
         # Store  siblings for current core in a map
         ht_siblings_map[core] = siblings
 
@@ -897,6 +917,7 @@ def _populate_cores_cpus():
 
         # Create core object
         core_obj = Core(core, cpu_obj)
+        core_obj.online = bool(core_online)
         cpu_obj.core_list.append(core_obj)
 
         # Create system object
