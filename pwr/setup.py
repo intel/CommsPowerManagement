@@ -41,4 +41,5 @@ It is intended to be used to build various orchestration and platform power mana
         'Programming Language :: Python :: 3.8',
     ],
     python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, <4',
+    zip_safe=False
 )
