@@ -97,22 +97,22 @@ class Core(object):
         Get constant capabilities of core, this is called at core initialization
         and does not need to be called by the application
         """
+        self.base_freq = self.cpu.base_freq
 
         # On initialization these values need to be checked before checking is sst_bf enabled
         try:
             self.sst_bf_base_freq = int(
                 _read_sysfs(self._sst_bf_base_filename)) // 1000
         except (IOError, OSError) as err:
-            if self.cpu.sys.sst_bf_enabled is None:  # Before this could be set to False on init
-                pass
+            if err.errno == 2:  # SST-BF not enabled
+                self.sst_bf_base_freq = self.base_freq
             else:
                 raise IOError("{}\n"
                               "Could not read core {} SST-BF base frequency "
                               "from sysfs entry '{}'"
                               .format(err, self.core_id,
-                                      self._sst_bf_base_filename))
+                              self._sst_bf_base_filename))
 
-        self.base_freq = self.cpu.base_freq
 
         # Check if core is high priority, depending on base frequency
         if self.cpu.sys.sst_bf_enabled and self.sst_bf_base_freq > self.base_freq:
