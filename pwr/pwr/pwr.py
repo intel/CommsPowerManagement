@@ -83,7 +83,7 @@ class Core(object):
         self._idle_filename = os.path.join(
             BASE_PATH, self._cpu_name, "cpuidle")
         try:
-            cstate_fnames = os.listdir(os.path.join(self._idle_filename)) 
+            cstate_fnames = os.listdir(os.path.join(self._idle_filename))
             self._states_name_map = {
                 fnames: _read_sysfs(os.path.join(self._idle_filename, fnames, "name"))
                 for fnames in cstate_fnames
@@ -93,7 +93,7 @@ class Core(object):
                 self._states_name_map = {}
             else:
                 raise IOError("{}\nCould not read from cpuidle directory".format(err))
-       
+
 
     def _read_capabilities(self):
         """
@@ -951,5 +951,13 @@ def _populate_cores_cpus():
     for core in CORES:
         core._read_capabilities()
         core.refresh_stats()
+    SYSTEM._read_capabilities()
+
+    # there are interdependencies between system, CPU's and cores, so re-read
+    # everything again to have the most up-to-date view of the system
+    for core in CORES:
+        core._read_capabilities()
+    for cpu in CPUS:
+        cpu._read_capabilities()
     SYSTEM._read_capabilities()
     SYSTEM.refresh_stats()
