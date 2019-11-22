@@ -83,14 +83,17 @@ class Core(object):
         self._idle_filename = os.path.join(
             BASE_PATH, self._cpu_name, "cpuidle")
         try:
-            cstate_fnames = os.listdir(os.path.join(self._idle_filename))
+            cstate_fnames = os.listdir(os.path.join(self._idle_filename)) 
+            self._states_name_map = {
+                fnames: _read_sysfs(os.path.join(self._idle_filename, fnames, "name"))
+                for fnames in cstate_fnames
+            }
         except IOError as err:
-            raise IOError(
-                "{}\nCould not read from cpuidle directory".format(err))
-        self._states_name_map = {
-            fnames: _read_sysfs(os.path.join(self._idle_filename, fnames, "name"))
-            for fnames in cstate_fnames
-        }
+            if err.errno == 2:  # cpuidle driver not present
+                self._states_name_map = {}
+            else:
+                raise IOError("{}\nCould not read from cpuidle directory".format(err))
+       
 
     def _read_capabilities(self):
         """
@@ -181,11 +184,12 @@ class Core(object):
         def get_cstates():
             """ Get available C-states enabled/disabled state """
             c_states = {}
+
             for state, cstate_name in self._states_name_map.items():
                 disabled_fname = os.path.join(
                     self._idle_filename, state, "disable")
-                disabled_flag = not bool(_read_sysfs(disabled_fname))
-                c_states[cstate_name] = disabled_flag
+                enabled_flag = not bool(int(_read_sysfs(disabled_fname)))
+                c_states[cstate_name] = enabled_flag
 
             return c_states
 
@@ -265,6 +269,12 @@ class Core(object):
 
         def set_cstates(self):
             """ Set C-states to enabled/disabled state """
+            expected = set(self._states_name_map.values())
+            found = set(self.cstates.keys())
+
+            if found != expected:
+                raise ValueError("Invalid requested C-state configuration")
+
             # Check core attribute and write to relevant sysfs
             for state, name in self._states_name_map.items():
                 disable = int(not self.cstates[name])

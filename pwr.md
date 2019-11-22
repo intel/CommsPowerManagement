@@ -250,6 +250,7 @@ for core in cores:
     core.cstates["C6"] = False  # Disabling C6
     core.commit()
 ```
+> NOTE: If cpuidle driver is not present, cstate configuration is unavailable and each `core.cstates` attribute will be an empty dictionary.
 
 ## Request Configuration
 
