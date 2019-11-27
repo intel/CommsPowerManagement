@@ -660,10 +660,13 @@ class System(object):
                 cpus = self.cpu_list
             cores = [c for cpu in cpus for c in cpu.core_list]
 
+            # ensure all frequencies are valid
+            for core in cores:
+                check_valid_core_freq(core)
+
             # Check for SST-BF configuration
             if self.sst_bf_enabled:
                 for core in cores:
-                    check_valid_core_freq(core)
                     target = set([core.sst_bf_base_freq])
                     if set([core.min_freq, core.max_freq]) != target:
                         break
