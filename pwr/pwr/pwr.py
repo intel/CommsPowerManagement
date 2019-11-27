@@ -578,9 +578,9 @@ class CPU(object):
         def check_sst_bf_configured():
             if not self.sys.sst_bf_enabled:
                 return False
-            for core in self.core_list:
-                core.refresh_stats()
-                if core.min_freq != core.sst_bf_base_freq or core.max_freq != core.sst_bf_base_freq:
+            for _core in self.core_list:
+                _core.refresh_stats()
+                if _core.min_freq != _core.sst_bf_base_freq or _core.max_freq != _core.sst_bf_base_freq:
                     return False
             return True
 
