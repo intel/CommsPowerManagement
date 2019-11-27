@@ -579,6 +579,7 @@ class CPU(object):
             if not self.sys.sst_bf_enabled:
                 return False
             for core in self.core_list:
+                core.refresh_stats()
                 if core.min_freq != core.sst_bf_base_freq or core.max_freq != core.sst_bf_base_freq:
                     return False
             return True
