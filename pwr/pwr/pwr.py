@@ -729,6 +729,7 @@ class System(object):
         self._check_epp_enabled()
 
     def refresh_stats(self):
+        """ Refresh system stats """
         def check_sst_bf_configured():
             """
             SST_BF is configured when the min & max of all cores is set to
@@ -739,9 +740,10 @@ class System(object):
                     cpu.sst_bf_configured = False
                     continue
                 # assume configured unless we find otherwise
-
                 for core in cpu.core_list:
                     target = set([core.sst_bf_base_freq])
+                    # refresh the core before reading min
+                    core.refresh_stats()
                     if set([core.min_freq, core.max_freq]) != target:
                         cpu.sst_bf_configured = False
                         break
@@ -752,12 +754,13 @@ class System(object):
 
         check_sst_bf_configured()
 
+
     def refresh_all(self):
         """ Refresh all system, cpu and core stats """
-        for cpu in self.cpu_list:
-            cpu.refresh_stats()
         for core in CORES:
             core.refresh_stats()
+        for cpu in self.cpu_list:
+            cpu.refresh_stats()
         self.refresh_stats()
 
 
