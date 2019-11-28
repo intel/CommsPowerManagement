@@ -1,6 +1,6 @@
 Metadata-Version: 1.2
 Name: pwr
-Version: 0.2.0
+Version: 0.2.1
 Summary: Python library providing various tools to work with Intel processors
 Home-page: https://github.com/intel/CommsPowerManagement
 Author: Intel Corporation
