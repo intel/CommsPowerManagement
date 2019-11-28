@@ -9,7 +9,7 @@ The library will provide a list of core, CPU objects, and a system object, some 
 The module requires that hardware P-States are enabled in the BIOS and the intel_pstate performance scaling driver is used in the kernel.
 Specific features of the module can only be utilized as long as the underlying hardware/software has that capability. Minimum requirements for these features are as follows:
 
-* Intel(R) Speed Select Technology - Base Frequency (SST-BF): 
+* Intel(R) Speed Select Technology - Base Frequency (SST-BF):
     * Requires Linux kernel v5.1 or later.
     * SST-BF compatible BIOS (For Intel(R) boards, please check their respective BIOS downloads, for example [the S2600WF BIOS with SST-BF support](https://downloadcenter.intel.com/download/29105/Intel-Server-Board-S2600WF-Family-BIOS-and-Firmware-Update-Package-for-UEFI?v=t)
 
@@ -82,7 +82,7 @@ Each system, cpu and core object have attributes which replicate the capabilitie
 ### Core
 
 * `core_id`                 # logical core id number
-* `online`                  # core availability flag 
+* `online`                  # core availability flag
 * `cpu`                     # this cores cpu object
 * `thread_siblings`         # list of other logical cores residing on same physical core
 * `high_priority`           # boolean value indicating whether the core will be set up to be a high priority core when SST-BF is configured.
@@ -116,14 +116,14 @@ Modification of the power settings of a system is done by altering the core or C
 then finalizing with the `commit()` function call. Commits can be done at a core, cpu or system level.
 
 ```python
-cores = pwr.get_cores()  
+cores = pwr.get_cores()
 
 for core in cores:  # Loop through core objects in list
     core.min_freq = core.base_freq  # Set desired minimum frequency to be the base frequency
     core.max_freq = core.highest_freq  # Set the desired maximum frequency to the highest available
     core.commit()  # Commits this cores changes to be made on system
 ```
-or 
+or
 ```python
 system, cpus, cores = pwr.get_objects()
 
@@ -150,7 +150,7 @@ When an application is modifying the desired min and max core frequencies, pre-s
 For c in cores:
     c.commit("sst_bf")  # Configure cores with the SST-BF configuration
 ```
-or 
+or
 ```python
 system.commit("sst_bf")  # Configure system with the SST-BF configuration
 ```
@@ -210,6 +210,10 @@ for c in cores:
         c.commit("sst_bf_base")  # Set cores to SST-BF configuration
 ```
 
+> NOTE: due to inter-dependencies between objects, calling `refresh_stats()` on
+> any object may affect other objects, so it is recommended to call `commit()`
+> as soon as possible.
+
 ## Object Referencing
 
 Once you have any one of the three library objects you can access the other two.
@@ -243,7 +247,7 @@ cstates = { 'C6': True,
             'C1E': True,
             'POLL': True}
 ```
- C-State configuration can be modified by writing True/False to corresponding dict value, to enable/disable respectively, then committing. 
+ C-State configuration can be modified by writing True/False to corresponding dict value, to enable/disable respectively, then committing.
 ```python
 for core in cores:
     core.cstates["C1"] = True  # Enabling C1
@@ -255,7 +259,7 @@ for core in cores:
 ## Request Configuration
 
 An application can request to check if a certain core frequency configuration is stable. This should be used as an indicator as to whether the configuration is within the TDP threshold. A positive return from the API is not a guarantee on the configuration, but a gauge on whether the setup is likely to stay within the available power budget. Once the request is validated the application can then proceed to commit it to the system.
-The request is checked through `system.request_configuration()`. If the request is called with no arguments the check will be done on the current configuration of all core objects across the system. If the request is called with a CPU object or a list of CPU objects, a check will be done on just the given CPU(s).  This feature can be utilized to allow the user to to frame core frequencies within stable boundaries while also getting desired results. 
+The request is checked through `system.request_configuration()`. If the request is called with no arguments the check will be done on the current configuration of all core objects across the system. If the request is called with a CPU object or a list of CPU objects, a check will be done on just the given CPU(s).  This feature can be utilized to allow the user to to frame core frequencies within stable boundaries while also getting desired results.
 
 
 ```python
