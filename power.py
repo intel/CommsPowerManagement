@@ -144,7 +144,6 @@ def get_cstates():
         states = os.listdir("/sys/devices/system/cpu/cpu0/cpuidle/")
     except:
         states = ""
-    stateList = ""
     for state in states:
         stateFileName = "/sys/devices/system/cpu/cpu0/cpuidle/" + state + "/name"
         stateFile = open(stateFileName, 'r')
