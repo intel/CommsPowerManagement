@@ -87,7 +87,8 @@ def _get_pkg_name(cpu):
     except (IOError, OSError) as err:
         raise IOError(
             "{}\nCould not read name".format(err))
-    cpu.name = _read_sysfs(path)
+    raw_cpu_name = _read_sysfs(path)
+    cpu.name = raw_cpu_name.replace("-", "_")
 
 def _get_power_consumption_sysfs(cpu):
     powercap_cpu_base = os.path.join(
@@ -173,11 +174,11 @@ def read_func():
         pkg_power = _read_pkg_power(cpu)
         # Dispatch value to collectd
         val = collectd.Values(type='power')
-        val.plugin = cpu.name + '-power'
+        val.plugin = cpu.name + '_power'
         val.dispatch(values=[pkg_power])
         #Dispatch TDP value
         val = collectd.Values(type='power')
-        val.plugin = cpu.name + '-TDP-power'
+        val.plugin = cpu.name + '_TDP_power'
         val.dispatch(values=[cpu.tdp])
 
 collectd.register_config(config_func)
