@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2020-21 Intel Corporation
+
+---
+- name: Install python - CentOS
+  yum:
+    name: python3
+    state: present
+  when: ansible_os_family == 'CentOS'
+
+- name: Install python - RedHat
+  yum:
+    name: python3
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Install python - SuSE
+  zypper:
+    name: python3
+    state: present
+  when: ansible_os_family == 'Suse'

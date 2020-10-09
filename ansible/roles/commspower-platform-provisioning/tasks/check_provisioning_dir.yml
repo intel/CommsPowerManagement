@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2020-21 Intel Corporation
+
+---
+- name: Check profile directory exists
+  stat:
+    path: "{{ prov_status_dir }}"
+  register: profile_folder
+
+- name: Create profile dir if not exists
+  file:
+    path: "{{ prov_status_dir }}"
+    state: directory
+    mode: 0755
+    group: root
+    owner: root
+  when: not profile_folder.stat.exists

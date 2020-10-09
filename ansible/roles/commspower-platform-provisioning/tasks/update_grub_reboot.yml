@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2020-21 Intel Corporation
+
+---
+# Replace the default grub command line with custom boot parameters.
+- name: Update default grub config for RedHat or CentOS
+  lineinfile:
+    dest: "{{ grub_cmdline_default }}"
+    line: GRUB_CMDLINE_LINUX="{{ grub_cmdline_add_args | join(' ') }}"
+    regexp: '^GRUB_CMDLINE_LINUX="'
+  when: >
+    ansible_os_family == "RedHat" or
+    ansible_os_family == "CentOS"
+
+# Replace the default grub command line with custom boot parameters.
+- name: Update default grub config for Suse
+  lineinfile:
+    dest: "{{ grub_cmdline_default }}"
+    line: GRUB_CMDLINE_LINUX_DEFAULT="{{ grub_cmdline_add_args | join(' ') }}"
+    regexp: '^GRUB_CMDLINE_LINUX_DEFAULT="'
+  when: >
+    ansible_os_family == "Suse"
+
+- name: check that EFI config path exists
+  stat: path={{ efi_boot_config }}/{{ ansible_facts['distribution'] }}/grub.cfg
+  register: path
+
+- name: Update EFI config file
+  shell: grub2-mkconfig -o
+         {{ efi_boot_config }}/{{ ansible_facts['distribution'] }}/grub.cfg
+  when: path.stat.exists
+
+- name: check that grub config path exists
+  stat: path={{ grub_boot_config }}/grub.cfg
+  register: path
+
+- name: Update grub config file
+  shell: grub2-mkconfig -o
+         {{ grub_boot_config }}/grub.cfg
+  when: path.stat.exists
+
+- name: check that grub2 config path exists
+  stat: path={{ grub2_boot_config }}/grub.cfg
+  register: path
+
+- name: Update grub2 config file
+  shell: grub2-mkconfig -o
+         {{ grub2_boot_config }}/grub.cfg
+  when: path.stat.exists
+
+- name: Reboot the board for new boot params
+  reboot:
+    reboot_timeout: 700
+  when: >
+     (ansible_os_family == "RedHat" or
+     ansible_os_family == "CentOS" or
+     ansible_os_family == "Suse")

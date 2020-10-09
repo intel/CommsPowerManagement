@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2020-21 Intel Corporation
+
+---
+# Create the directory under /tmp folder, ansible will name the
+# dir as ansible*.<msrtools_dir>
+- name: Create msrtools temporary dir
+  tempfile:
+    state: directory
+    suffix: "{{ msrtools_dir }}"
+  register: msrtools_path
+
+# Clone the msrtools repo to /tmp/ansible*.<msrtools_dir>
+- name: Clone msrtools repo
+  git:
+    repo: "{{ msrtools_repo }}"
+    version: "{{ msrtools_version }}"
+    dest: "{{ msrtools_path.path }}"
+    update: yes
+
+# Build msr-tools
+- name: Build and install msrtools repo
+  make:
+    chdir: "{{ msrtools_path.path }}"
+    target: install
+
+# Remove msr-tools repo
+- name: remove msr tools tmp dir
+  file:
+    path: "{{ msrtools_path.path }}"
+    state: absent

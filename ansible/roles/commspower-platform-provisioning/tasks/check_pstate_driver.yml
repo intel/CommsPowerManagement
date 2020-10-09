@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2020-21 Intel Corporation
+
+---
+
+# Enable the pstate driver to use HWP registers.
+- name: Check if frequency scaling is available
+  stat:
+    path: grep -E 'intel_pstate|acpi_cpufreq' "{{ pstate_sysfs_path }}"
+  register: pstate_driver
+  changed_when: false
+
+- name: Print pstate driver state
+  debug:
+    msg: "pstate driver should be enabled"
+  when: pstate_driver.stat.exists

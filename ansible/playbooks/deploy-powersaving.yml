@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2020-21 Intel Corporation
+---
+- name: Deploy commspower-platform-provisioning
+  hosts: webservers
+  roles:
+    - role: ../roles/commspower-platform-provisioning
+      state: powersaving

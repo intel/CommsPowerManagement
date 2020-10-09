@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2020-21 Intel Corporation
+
+---
+- name: Install GIT - RedHat
+  yum:
+    name: git
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Install GIT - CentOS
+  yum:
+    name: git
+    state: present
+  when: ansible_os_family == 'CentOS'
+
+- name: Install GIT - SUSE
+  zypper: 'name=git-core state=present'
+  when: ansible_os_family == 'Suse'

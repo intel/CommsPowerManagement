@@ -1,0 +1,81 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2020-21 Intel Corporation
+
+---
+# Install prerequisites.
+- import_tasks: install_git.yml
+- import_tasks: install_python.yml
+- import_tasks: install_msr_tools.yml
+
+# Make sure the kernel has below flag enabled.
+# If not system not suitable for latency testing.
+- name: Check for CONFIG_NO_HZ_FULL=y
+  command: grep CONFIG_NO_HZ_FULL=y /boot/config-"{{ansible_kernel}}"
+  register: nohzcheck
+  changed_when: false
+
+# Update grub with new boot params and reboot
+- include_tasks: update_grub_reboot.yml
+
+# Check msr driver availability
+- include_tasks: check_msr_driver.yml
+
+# Set uncore frequency
+- include_tasks: set_uncore_frequency.yml
+
+# Check Pstate driver enabled
+- include_tasks: check_pstate_driver.yml
+
+# Find the C states sysfs path files for list of latency cores.
+- name: Find C states sysfs, state1,state2... stateN, excluding state0.
+  find:
+    paths: /sys/devices/system/cpu/cpu{{ item }}/cpuidle
+    recurse: no
+    file_type: directory
+    excludes: 'state0'
+  register: cstate_paths
+  loop: "{{ cores|flatten(levels=1) }}"
+  changed_when: false
+  ignore_errors: yes
+
+# enable this task to print more debug info
+# - name: Print idle driver state
+#   debug:
+#     msg: "{{ item.files[0].path }} {{ item.files[1].path }}
+#              {{ item.files[2].path }}"
+#     msg: "{{ item.files }}"
+#     msg: "{{ item.matched }}"
+#   loop: "{{ cstate_paths.results|flatten(levels=2) }}"
+
+# Disable the c states on latency cores.
+- name: disable the cstate
+  vars:
+    total: "{{item.matched}}"
+  shell: |
+    {% set var = total|int %}
+    {% for c in range(var) %}
+       echo "1" > {{ item.files[c].path }}/disable
+    {% endfor %}
+  loop: "{{ cstate_paths.results|flatten(levels=2) }}"
+
+# Clone the commspowermgmt repo.
+- include_tasks: clone_commspower_repo.yml
+
+# Create provisioning status dir
+- include_tasks: check_provisioning_dir.yml
+
+# Create the empty file to indicate latency provisioning is done.
+- name: Create lowlatency provisioning done file
+  file:
+    path: "{{ prov_status_dir }}/lowlatency"
+    state: touch
+    owner: root
+    group: root
+    mode: 0644
+
+# Additional info for user
+- name: Warn with recommened settings.
+  debug:
+    msg: "1.Unbind unused NICs from kernel driver to eliminate unnecessary
+            interrupts,
+          2.Set process shceduling policy/priority by 'chrt -f -p 99 <pid>'"

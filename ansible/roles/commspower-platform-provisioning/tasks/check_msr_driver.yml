@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2020-21 Intel Corporation
+
+---
+
+# Check for CONFIG_X86_MSR
+- name: Check for CONFIG_X86_MSR=m
+  command: grep CONFIG_X86_MSR=m /boot/config-"{{ansible_kernel}}"
+  register: msrcheck
+  changed_when: false
+  ignore_errors: yes
+
+# Load MSR module
+- name: Load MSR
+  modprobe:
+    name: msr
+    state: present
+    # check if msr is avialbale as module in config file, if so do modprobe
+  when: msrcheck.rc == 0

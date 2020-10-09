@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2020-21 Intel Corporation
+
+---
+# Create the directory under /tmp folder, ansible will name the
+# dir as ansible*.<commspower_dir>
+- name: Create commspower temporary dir
+  tempfile:
+    state: directory
+    suffix: "{{ commspower_dir }}"
+  register: commspower_path
+
+# Clone the commspower repo to /tmp/ansible*.<commspower_dir>
+- name: Clone CommsPowerManagement repo
+  git:
+    repo: "{{ commspower_repo }}"
+    version: "{{ commspower_repo_version }}"
+    dest: "{{ commspower_path.path }}"
+    update: yes

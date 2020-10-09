@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2020-21 Intel Corporation
+
+---
+# Low latency provissioning
+- include_tasks: lowlatency.yml
+  when: state == "lowlatency"
+
+# Power saving provissioning
+- include_tasks: powersaving.yml
+  when: state == "powersaving"

@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2020-21 Intel Corporation
+
+---
+
+# Check intel-uncore-frequency driver presence
+- name: Check intel-uncore-frequency driver presence
+  shell: lsmod | grep -i intel-uncore-frequency
+  register: uncore_freq_driver
+  ignore_errors: yes
+
+# Print the current processor model name.
+- name: Print processor
+  debug:
+    msg: '{{ ansible_processor[2] }}'
+
+# Set the uncore frequency using msrs if intel-uncore-frequency driver
+# unavailable
+- name: Set uncore frequency using MSR
+  vars:
+    uncore_frequency: "{{ uncore_freq_clx if ansible_processor[2] ==
+                          clx_type else uncore_freq_icx}}"
+  command: wrmsr -a 0x620 "{{ uncore_frequency }}"
+  when: uncore_freq_driver.rc == 1
+  ignore_errors: yes
+
+# Find the sysfs entry for uncore frequency setting
+- name: Set uncore frequency using sysfs
+  find:
+    paths: "{{ uncore_sysfs_path }}"
+    recurse: no
+    file_type: directory
+  register: uncore_paths
+  changed_when: false
+  when: uncore_freq_driver.rc == 0
+  ignore_errors: yes
+
+# enable this task to print uncore sysfs paths finding.
+# - name: Print uncore sysfs file info
+#   debug:
+#     msg: "{{ item.path}}"
+#   loop: "{{ uncore_paths.files|flatten(levels=2) }}"
+#   when: uncore_freq_driver.rc == 0
+
+# Set the uncore frequency using sysfs path.
+- name: set uncore frequency
+  vars:
+    uncore_frequency: "{{ uncore_freq_clx_khz if ansible_processor[2] ==
+                          clx_type else uncore_freq_icx_khz}}"
+  shell: |
+    echo "{{ uncore_frequency }}" > "{{item.path}}"/"{{uncore_maxfreq_file}}";
+    echo "{{ uncore_frequency }}" > "{{item.path}}"/"{{uncore_minfreq_file}}";
+    echo "{{ uncore_frequency }}" > "{{item.path}}"/"{{uncore_maxfreq_file}}";
+  loop: "{{ uncore_paths.files|flatten(levels=2) }}"
+  when: uncore_freq_driver.rc == 0

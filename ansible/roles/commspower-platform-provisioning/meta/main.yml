@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2020-21 Intel Corporation
+
+---
+galaxy_info:
+  author: Reshma Pattan
+  description: Configures the system for power saving and low latency workloads.
+  company: Intel Corporation
+
+  license: BSD-3-Clause
+
+  min_ansible_version: 2.9
+
+  platforms:
+    - name: Suse
+      versions:
+        - 12
+    - name: CentOS
+      versions:
+        - 7
+        - 8
+    - name: RHEL
+      versions:
+        - 8.2
+        - 8.3
+
+  galaxy_tags: []
+
+  dependencies: []

@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2020-21 Intel Corporation
+
+---
+
+- name: Check cstate driver is enabled
+  stat:
+    path: grep 'intel_idle' "{{ cstate_sysfs_path }}"
+  register: cstate_driver
+  changed_when: false
+
+- name: Print cstate driver state
+  debug:
+    msg: "cstate driver should be enabled"
+  when: cstate_driver.stat.exists

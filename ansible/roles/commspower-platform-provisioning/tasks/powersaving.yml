@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2020-21 Intel Corporation
+
+---
+# Install prerequisites.
+- import_tasks: install_git.yml
+
+- import_tasks: install_msr_tools.yml
+  when: (ansible_os_family == "Suse" and
+         ansible_distribution_major_version == "12")
+
+# Check msr driver/module availability
+- include_tasks: check_msr_driver.yml
+  when: state == "present"
+
+# Check HWP enabled.
+- name: Check HWP enabled
+  shell: test "$(rdmsr -p 0 0x770)" -eq 1
+
+# Check Pstate driver enabled
+- include_tasks: check_pstate_driver.yml
+  when: state == "present"
+
+# Check Cstate driver enabled
+- include_tasks: check_cstate_driver.yml
+  when: state == "present"
+
+# Find the C states above C1 from sysfs path files.
+- name: Find C states sysfs, state1,state2... stateN, excluding state0.
+  find:
+    paths: /sys/devices/system/cpu/cpu{{ item }}/cpuidle
+    recurse: no
+    file_type: directory
+    excludes: 'state0,state1'
+  register: cstate_paths
+  with_sequence: start=0 end={{ansible_processor_count*ansible_processor_cores*
+                               ansible_processor_threads_per_core-1}}
+  changed_when: false
+  ignore_errors: yes
+
+# Disable the C states above C1.
+- name: disable the cstate
+  vars:
+    total: "{{item.matched}}"
+  shell: |
+    {% set var = total|int %}
+    {% for c in range(var) %}
+       echo "1" > {{ item.files[c].path }}/disable
+    {% endfor %}
+  loop: "{{ cstate_paths.results|flatten(levels=2) }}"
+
+# Create provisioning status dir
+- include_tasks: check_provisioning_dir.yml
+
+# Create the empty file to indicate powersaving provisioning is done.
+- name: Create powersaving provisioning done file
+  file:
+    path: "{{ prov_status_dir }}/powersaving"
+    state: touch
+    owner: root
+    group: root
+    mode: 0644

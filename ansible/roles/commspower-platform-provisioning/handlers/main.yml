@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2020-21 Intel Corporation
+
+---
+# handlers file for commspower-platform-provisioning
+
+- name: Print nohzcheck
+  shell: echo "CONFIG_NO_HZ_FULL=y is set"
