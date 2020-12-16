@@ -16,7 +16,7 @@ plugin in collectd run, follow below steps.
 1)Clone the collectd code
 2)Build and install it.
 3)Edit and uncomment below lines of python plugin section from
-collect.conf file to enable the pkgpower.py.
+collectd.conf file to enable the pkgpower.py.
 
     #LoadPlugin python
 
