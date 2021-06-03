@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2021-22 Intel Corporation
+
+---
+
+# Check for CONFIG_NUMA_BALANCING
+- name: Check for CONFIG_NUMA_BALANCING=y
+  command: grep CONFIG_NUMA_BALANCING=y /boot/config-"{{ansible_kernel}}"
+  register: numa_blancing_check
+  changed_when: false
+  ignore_errors: yes
+
+# Disable numa balancing
+- name: Disable Numa Balancing
+  shell:
+       echo "0" > /proc/sys/kernel/numa_balancing
+  # if numa balancing enabled
+  when: numa_blancing_check.rc == 0

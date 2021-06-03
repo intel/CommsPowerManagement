@@ -58,6 +58,9 @@
     {% endfor %}
   loop: "{{ cstate_paths.results|flatten(levels=2) }}"
 
+# Disable numa balancing
+- include_tasks: disable_numa_balancing.yml
+
 # Clone the commspowermgmt repo.
 - include_tasks: clone_commspower_repo.yml
 
