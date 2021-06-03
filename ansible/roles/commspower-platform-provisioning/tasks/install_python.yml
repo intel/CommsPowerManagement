@@ -19,3 +19,9 @@
     name: python3
     state: present
   when: ansible_os_family == 'Suse'
+
+- name: Install python - Debian
+  apt:
+    name: python3
+    state: present
+  when: ansible_os_family == 'Debian'

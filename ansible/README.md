@@ -12,7 +12,7 @@ October 2020
 ## INTRODUCTION
 An Ansible Collection with single role comms_power_provisioning,
 that configures the system for low latency and power saving for
-RHEL/CentOS and SUSE Linux distributions.
+RHEL/CentOS/Debian and SUSE Linux distributions.
 
 ## REQUIREMENTS
 - Ansible installed.

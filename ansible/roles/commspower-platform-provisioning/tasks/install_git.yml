@@ -17,3 +17,9 @@
 - name: Install GIT - SUSE
   zypper: 'name=git-core state=present'
   when: ansible_os_family == 'Suse'
+
+- name: Install GIT - Debian
+  apt:
+    name: git
+    state: present
+  when: ansible_os_family == 'Debian'

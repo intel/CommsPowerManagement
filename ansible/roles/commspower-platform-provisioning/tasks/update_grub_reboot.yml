@@ -19,7 +19,8 @@
     line: GRUB_CMDLINE_LINUX_DEFAULT="{{ grub_cmdline_add_args | join(' ') }}"
     regexp: '^GRUB_CMDLINE_LINUX_DEFAULT="'
   when: >
-    ansible_os_family == "Suse"
+    ansible_os_family == "Suse" or
+    ansible_os_family == "Debian"
 
 - name: check that EFI config path exists
   stat: path={{ efi_boot_config }}/{{ ansible_facts['distribution'] }}/grub.cfg
@@ -54,4 +55,5 @@
   when: >
      (ansible_os_family == "RedHat" or
      ansible_os_family == "CentOS" or
-     ansible_os_family == "Suse")
+     ansible_os_family == "Suse" or
+     ansible_os_family == "Debian")
