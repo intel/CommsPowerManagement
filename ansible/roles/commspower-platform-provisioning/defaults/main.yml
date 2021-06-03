@@ -54,6 +54,7 @@ grub_cmdline_default: /etc/default/grub
 efi_boot_config: /boot/efi/EFI
 grub_boot_config: /boot/grub
 grub2_boot_config: /boot/grub2
+grubmkcfg: /usr/sbin/grub*-mkconfig
 
 # pstate driver path
 pstate_sysfs_path: /sys/devices/system/cpu/cpufreq/policy0/scaling_driver

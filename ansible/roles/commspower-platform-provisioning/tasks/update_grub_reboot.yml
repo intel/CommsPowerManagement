@@ -26,8 +26,8 @@
   register: path
 
 - name: Update EFI config file
-  shell: grub2-mkconfig -o
-         {{ efi_boot_config }}/{{ ansible_facts['distribution'] }}/grub.cfg
+  shell: "{{ grubmkcfg }} -o
+         {{ efi_boot_config }}/{{ ansible_facts['distribution'] }}/grub.cfg"
   when: path.stat.exists
 
 - name: check that grub config path exists
@@ -35,8 +35,8 @@
   register: path
 
 - name: Update grub config file
-  shell: grub2-mkconfig -o
-         {{ grub_boot_config }}/grub.cfg
+  shell: "{{ grubmkcfg }} -o
+         {{ grub_boot_config }}/grub.cfg"
   when: path.stat.exists
 
 - name: check that grub2 config path exists
@@ -44,8 +44,8 @@
   register: path
 
 - name: Update grub2 config file
-  shell: grub2-mkconfig -o
-         {{ grub2_boot_config }}/grub.cfg
+  shell: "{{ grubmkcfg }} -o
+         {{ grub2_boot_config }}/grub.cfg"
   when: path.stat.exists
 
 - name: Reboot the board for new boot params
