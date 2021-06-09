@@ -128,7 +128,8 @@ class Core(object):
     def refresh_stats(self):
         """ Get current regularly changing or user defined stats of core """
         valid_range = [v for v in range(
-            self.lowest_freq, self.highest_freq + 100, 100)]
+            self.lowest_freq, self.highest_freq, 100)]
+        valid_range.append(self.highest_freq)
 
         def get_desired_min_freq():
             """ Get current desired minimum core frequency """
@@ -282,7 +283,8 @@ class Core(object):
                     self._idle_filename, state, "disable"), disable)
 
         valid_range = [v for v in range(
-            self.lowest_freq, self.highest_freq + 100, 100)]
+            self.lowest_freq, self.highest_freq, 100)]
+        valid_range.append(self.highest_freq)
 
         if self.min_freq not in valid_range:
             raise ValueError("Cannot update core, min freq out of valid range. "
@@ -645,7 +647,8 @@ class System(object):
         def check_valid_core_freq(core):
             """ Ensure frequencies are valid """
             valid_range = [v for v in range(
-                self.cpu_list[0].lowest_freq, self.cpu_list[0].highest_freq + 100, 100)]
+                self.cpu_list[0].lowest_freq, self.cpu_list[0].highest_freq, 100)]
+            valid_range.append(self.cpu_list[0].highest_freq)
             if core.min_freq > core.max_freq:
                 raise ValueError("Invalid config, desired min freq({}) "
                                  "is greater than desired max freq({})" .format(core.min_freq, core.max_freq))
