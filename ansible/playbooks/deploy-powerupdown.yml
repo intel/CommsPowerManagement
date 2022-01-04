@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2021-22 Intel Corporation
+---
+- name: Deploy commspower-platform-provisioning
+  hosts: all
+  tasks:
+    - name: loop over role
+      include_role:
+        name: ../roles/commspower-platform-provisioning
+      vars:
+        state: "{{action_tobe.action}}"
+      with_items: "{{actions_to_apply}}"
+      loop_control:
+        loop_var: action_tobe

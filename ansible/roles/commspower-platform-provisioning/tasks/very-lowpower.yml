@@ -1,0 +1,82 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2020-21 Intel Corporation
+
+---
+- import_tasks: install_git.yml
+- import_tasks: install_msr_tools.yml
+
+# Check msr driver/module availability
+- include_tasks: check_msr_driver.yml
+
+# Check Cstate driver enabled
+- include_tasks: check_cstate_driver.yml
+
+# Find the C states above C0 from sysfs path files.
+- name: Find C states sysfs, state1,state2... stateN, excluding state0.
+  find:
+    paths: /sys/devices/system/cpu/cpu{{ core_id }}/cpuidle
+    recurse: no
+    file_type: directory
+    excludes: 'state0'
+  register: cstate_paths
+  with_items: "{{ action_tobe.core_list }}"
+  loop_control:
+    loop_var: core_id
+  changed_when: false
+  ignore_errors: yes
+
+# disable all the C states above C0.
+- name: disable all cstates
+  vars:
+    total: "{{cspaths0.matched}}"
+  shell: |
+    {% set var = total|int %}
+    {% for c in range(var) %}
+       echo "1" > {{ cspaths0.files[c].path }}/disable
+    {% endfor %}
+  loop: "{{ cstate_paths.results|flatten(levels=2) }}"
+  loop_control:
+    loop_var: cspaths0
+
+# now enable only C6 state
+- name: enable the c6 cstate
+  shell: |
+    echo "0" > {{ cspaths1.invocation.module_args.paths[0] }}/\
+    state{{cspaths1.matched}}/disable
+  loop: "{{ cstate_paths.results|flatten(levels=2) }}"
+  loop_control:
+    loop_var: cspaths1
+  when: (action_tobe.c6state is defined) and (action_tobe.c6state == 'on')
+
+# Set new  max frequency lowered by bins on set of cores.
+- name: get the max frequency of listed cores
+  shell:
+    cmd: cat /sys/devices/system/cpu/cpu{{core_id}}/cpufreq/scaling_max_freq
+  register: core_n_freq_dict
+  loop: "{{ action_tobe.core_list }}"
+  loop_control:
+    loop_var: core_id
+
+- name: set the new max frequency on listed cores
+  vars:
+    # Prepare freqMHz to be lowered from maximum frequency
+    freq_to_lower: |-
+      "{{ core_n_freq.stdout|int - action_tobe.bins_to_lower * 100000 }}"
+  shell: >-
+    echo "{{freq_to_lower}}" >
+    /sys/devices/system/cpu/cpu{{core_n_freq.core_id}}/cpufreq/scaling_max_freq
+  loop: "{{core_n_freq_dict.results}}"
+  loop_control:
+    loop_var: core_n_freq
+
+# Create provisioning status dir
+- include_tasks: check_provisioning_dir.yml
+
+# Create the empty file to indicate provisioning is done.
+- name: Create provisioning done file
+  file:
+    path: "{{ prov_status_dir }}/very-lowpower"
+    state: touch
+    owner: root
+    group: root
+    mode: 0644

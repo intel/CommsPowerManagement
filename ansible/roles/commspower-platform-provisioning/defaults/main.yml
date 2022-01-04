@@ -84,3 +84,5 @@ clx_type: Intel(R) Xeon(R) Gold 6230N CPU @ 2.30GHz
 
 # provisioning status files will be created under this path.
 prov_status_dir: /var/run/intel/platform-provisioning
+
+cpu_path: /sys/devices/system/cpu
