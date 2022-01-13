@@ -20,24 +20,11 @@
   changed_when: false
   ignore_errors: yes
 
-# disable all the C states above C0.
-- name: disable all cstates
-  vars:
-    total: "{{cspaths0.matched}}"
-  shell: |
-    {% set var = total|int %}
-    {% for c in range(var) %}
-       echo "1" > {{ cspaths0.files[c].path }}/disable
-    {% endfor %}
-  loop: "{{ cstate_paths.results|flatten(levels=2) }}"
-  loop_control:
-    loop_var: cspaths0
-
 - name: print c6state
   debug:
     msg: "{{ action_tobe.c6state}}"
 
-# now enable only C6 state
+# enable only C6 state
 - name: enable the c6 cstate
   shell: |
      echo "0" > {{ cspaths1.invocation.module_args.paths[0] }}/\
@@ -46,6 +33,16 @@
   loop_control:
     loop_var: cspaths1
   when: (action_tobe.c6state is defined) and (action_tobe.c6state == 'on')
+
+# disable only C6 state
+- name: disable the c6 cstate
+  shell: |
+     echo "1" > {{ cspaths1.invocation.module_args.paths[0] }}/\
+     state{{cspaths1.matched}}/disable
+  with_items: "{{ cstate_paths.results|flatten(levels=2) }}"
+  loop_control:
+    loop_var: cspaths1
+  when: (action_tobe.c6state is defined) and (action_tobe.c6state == 'off')
 
 # Create provisioning status dir
 - include_tasks: check_provisioning_dir.yml
