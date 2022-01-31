@@ -9,6 +9,7 @@ import re
 import struct
 import time
 from .internal import cpuinfo
+import glob
 
 MSR_PLATFORM_INFO = 0xCE
 MSR_TURBO_RATIO_LIMIT = 0x1AD
@@ -22,6 +23,7 @@ MSR_PKG_POWER_INFO = 0x614
 MSR_PKG_ENERGY_STATUS = 0x611
 BASE_PATH = "/sys/devices/system/cpu"
 BASE_POWERCAP_PATH = "/sys/devices/virtual/powercap/intel-rapl"
+UNCORE_PATH = "/sys/devices/system/cpu/intel_uncore_frequency/"
 
 # Core and cpu lists to be filled with corresponding objects
 CORES = []
@@ -359,6 +361,13 @@ class CPU(object):
         self._power_cons_max = None       # wraparound power consumption value
         self._power_cons_power_unit = None  # power unit as reported by MSR
         self._power_cons_energy_unit = None  # energy unit as reported by MSR
+        self._uncore_kernel_avail = False    # Does kernel version supports uncore freqs reading
+
+        # private file path variables
+        self._initial_max_freq_khz_filename = ''
+        self._initial_min_freq_khz_filename = ''
+        self._uncore_max_freq_khz_filename = ''
+        self._uncore_min_freq_khz_filename = ''
 
     def _read_capabilities(self, core=None):
         """
@@ -492,6 +501,32 @@ class CPU(object):
             self.tdp = get_tdp_sysfs()
             self._power_cons_max = get_max_power_consumption()
 
+        pkg_die_path = f"package_*{self.cpu_id}_die_*/"
+        path = os.path.join(UNCORE_PATH, pkg_die_path)
+        pkg_n_die_p = glob.glob(path)
+
+        try:
+            if pkg_n_die_p:
+                self._initial_max_freq_khz_filename = os.path.join(UNCORE_PATH,
+                                                    pkg_n_die_p[0],
+                                                    "initial_max_freq_khz")
+                self._initial_min_freq_khz_filename = os.path.join(UNCORE_PATH,
+                                                    pkg_n_die_p[0],
+                                                    "initial_min_freq_khz")
+                self._uncore_max_freq_khz_filename = os.path.join(UNCORE_PATH,
+                                                    pkg_n_die_p[0],
+                                                    "max_freq_khz")
+                self._uncore_min_freq_khz_filename = os.path.join(UNCORE_PATH,
+                                                    pkg_n_die_p[0],
+                                                    "min_freq_khz")
+
+                self.uncore_hw_max = int(_read_sysfs(self._initial_max_freq_khz_filename)) // 1000
+                self.uncore_hw_min = int(_read_sysfs(self._initial_min_freq_khz_filename)) // 1000
+                self.uncore_kernel_avail = True
+        except (IOError, OSError) as err:
+            # attempted to read uncore sysfs but failed, so fall back to MSR
+            pass
+
     # this isn't an inner function in refresh_stats because we need private state
     def _get_avg_power_consumption(self, core):
         """ Get average power consumption since last check """
@@ -609,7 +644,21 @@ class CPU(object):
         self.uncore_min_freq, self.uncore_max_freq = get_uncore_min_max()
         self.power_consumption = self._get_avg_power_consumption(core)
 
-    def commit(self):
+    def _validate_uncore_freq(self, uncore_freq):
+        """ check if uncore_freq is between System's uncore min and max """
+        sup_uncore_freqs = list(range(self.uncore_hw_min, self.uncore_hw_max+100, 100))
+        if uncore_freq not in sup_uncore_freqs:
+            raise ValueError("uncore frequency should be between {}Mhz-{}Mhz".
+                    format(self.uncore_hw_min, self.uncore_hw_max))
+
+    def _write_sysfs(self):
+        """ update uncore min/max using uncore sysfs files """
+        if not self._uncore_kernel_avail:
+            raise IOError("No sysfs entries for uncore frequency control")
+        _write_sysfs(self._uncore_max_freq_khz_filename, self.uncore_max_freq * 1000)
+        _write_sysfs(self._uncore_min_freq_khz_filename, self.uncore_min_freq * 1000)
+
+    def _write_msr(self):
         """ Update package wide MSRs with cpu object attributes """
         if self.uncore_min_freq > self.uncore_max_freq:
             raise ValueError("Cannot update uncore freq, desired min({}) greater than desired max({})"
@@ -624,6 +673,15 @@ class CPU(object):
                                    data[2], data[3], data[4], data[5], data[6], data[7])
         _wrmsr(self.core_list[0].core_id, MSR_UNCORE_RATIO_LIMIT, write_regstr)
 
+    def commit(self):
+        ''' Try to set uncore min/max using sysfs if available, else via MSR. '''
+        # making sure uncore_freq is between the system's uncore min and max value
+        self._validate_uncore_freq(self.uncore_min_freq)
+        self._validate_uncore_freq(self.uncore_max_freq)
+        try:
+            self._write_sysfs()
+        except(IOError, OSError):
+            self._write_msr()
 
 class System(object):
     """
