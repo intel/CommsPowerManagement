@@ -11,12 +11,11 @@ October 2020
 
 ## INTRODUCTION
 An Ansible collection with single role comms_power_provisioning, that
- configures the system for `lowlatency`, `powersaving`, `lowpower` and `very-lowpower` for RHEL/CentOS/Debian and SUSE Linux distributions.
+ configures the system for `lowlatency`, `powersaving`, `lowpower` and `very-lowpower`.
 
-## REQUIREMENTS
-- Ansible installed.
-
-- Suse system registered with SUSE and base packages installed.
+## PREREQUISITES
+- System with any of the below listed distros and with Ansible >= 2.9.4 installed.
+  RHEL/CentOS/Debian/SUSE.
 
 - Required global proxy settings setup according to the distribution.
  Inappropriate proxy settings might block the script from cloning repos
@@ -57,11 +56,6 @@ hosts: webservers
     - role: ../roles/commspower-platform-provisioning
       state: lowpower or very-lowpower
 ```
-
-## REQUIREMENTS
-```
-Ansible* >= 2.9.4
-````
 
 ## Usage
   . Edit the `main.yml` file under the role's "default" directory to suit your needs.
