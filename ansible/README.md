@@ -14,8 +14,8 @@ An Ansible collection with single role comms_power_provisioning, that
  configures the system for `lowlatency`, `powersaving`, `lowpower` and `very-lowpower`.
 
 ## PREREQUISITES
-- System with any of the below listed distros and with Ansible >= 2.9.4 installed.
-  RHEL/CentOS/Debian/SUSE.
+- System with any of the below listed distros, with python3 and Ansible >= 2.9.4 installed.
+  - RHEL/CentOS/Debian/SUSE.
 
 - Required global proxy settings setup according to the distribution.
  Inappropriate proxy settings might block the script from cloning repos
@@ -28,6 +28,16 @@ Based on user needs the parameters has to be adjusted.
 **Note**: Example `lowlatency` boot parameters are given in main.yml of "default"
 directory. These parameters have to be adjusted based on user system need.
 
+## INVENTORY FILE
+Ansible uses inventory file to get the list of servers which should be provissioned.
+User can chose any one of the below listed files as the inventory file and
+add the server information to the inventory file as per the ansible guidelines.
+
+```
+/etc/ansible/hosts
+/etc/ansible/hosts.yaml
+ansible/playbooks/inventory/hosts
+```
 
 ## EXAMPLE PLAYBOOK
 Playbook to deploy `lowlatency`:
@@ -58,17 +68,21 @@ hosts: webservers
 ```
 
 ## Usage
-  . Edit the `main.yml` file under the role's "default" directory to suit your needs.
+  . Edit the `main.yml` file `ansible/roles/commspower-platform-provisioning/defaults` to
+    change the variable values as per the user need.
 
-  . Edit ansible/playbooks/inventory/hosts to add targets under webservers.
+  . Use either of the below inventory files to define target servers information.
+    ansible/playbooks/inventory/hosts
 
   . Run `lowlatency` provisioning as below
   ```
-  ansible-playbook  -i ansible/playbooks/inventory/hosts ansible/playbooks/deploy-lowlatency.yml
+  ansible-playbook -i <inventory file> <playbook>
+  Example: ansible-playbook  -i ansible/playbooks/inventory/hosts ansible/playbooks/deploy-lowlatency.yml
   ```
   . Run `powersaving` provisioning as below
   ```
-  ansible-playbook  -i ansible/playbooks/inventory/hosts ansible/playbooks/deploy-powersaving.yml
+  ansible-playbook -i <inventory file> <playbook>
+  Example: ansible-playbook  -i ansible/playbooks/inventory/hosts ansible/playbooks/deploy-powersaving.yml
   ```
 . Run `lowpower` and `very-lowpower` provisioning as below.
   The playbook `deploy-powerupdown.yml` will take care of setting the
@@ -87,15 +101,16 @@ hosts: webservers
   of bins. User has to specify the list of cores on which C6 C-state should be
   `on` or `off`. Also, user has to specify the number of bins by which max frequency
   of the listed cores should be lowered. The user should specify the core list,
-  C6 C-state, bins and action details as variables in either of the below files.
+  C6 C-state, bins and action details as variables inside server group variables
+  files under the system default path i.e. `/etc/ansible/` as below.
 
   ```
-  /etc/ansible/hosts
-  /etc/ansible/hosts.yaml
-  /etc/ansible/group_vars/<serversgroup.yml>
-  Example: /etc/ansible/group_vars/webservers.yaml
+  Example file: /etc/ansible/group_vars/webservers.yaml
+  mkdir /etc/ansible/group_vars
+  touch /etc/ansible/group_vars/<serversgroup.yml>
   ```
- The action sections with variables should be added like below. The number of actions can vary. 
+ The action sections with variables should be added like below to the file created.
+ The number of actions can vary.
 
  **Note:** Do not add actions with an empty core list.
 
@@ -121,5 +136,6 @@ hosts: webservers
  ```
 
   ```
-  ansible-playbook  -i ansible/playbooks/inventory/hosts ansible/playbooks/deploy-powerupdown.yml
+  ansible-playbook -i <inventory file> <playbook>
+  Example: ansible-playbook  -i ansible/playbooks/inventory/hosts ansible/playbooks/deploy-powerupdown.yml
   ```

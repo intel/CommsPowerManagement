@@ -75,7 +75,14 @@ uncore_minfreq_file: min_freq_khz
 uncore_freq_clx_khz: 1800000
 uncore_freq_icx_khz: 1400000
 
-# uncore frequency (in Hex) to set using MSR.
+# The hex values below represents Uncore minimum and maximum Frequency
+# to be set using the MSR 0x620.
+# Higher byte represents minimum Uncore Frequency.
+# Lower byte represents maximum Uncore Frequency.
+# The decimal equivalent of byte 0x12 is 18, so 18*100Mhz=1800Mhz is set
+# as the Uncore minimum and maximum Frequency on the CLX system
+# Similarly The decimal equivalent of byte 0x0e is 14 , so 14*100Mhz=1400Mhz
+# is set as the Uncore minimum and maximum Frequency on the ICX system
 uncore_freq_clx: 0x1212
 uncore_freq_icx: 0x0e0e
 
