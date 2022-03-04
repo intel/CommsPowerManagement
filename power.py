@@ -347,8 +347,12 @@ def set_max_cpu_freq(maxfreq, cpurange):
     for x in cpurange:
         maxName = "/sys/devices/system/cpu/cpu" + \
             str(x) + "/cpufreq/scaling_max_freq"
+        try:
+            maxFile = open(maxName, 'w')
+        except OSError:
+            print("Could not open '" + str(maxName) + "', skipping.")
+            continue
         print("Writing " + str(maxfreq) + " to " + maxName)
-        maxFile = open(maxName, 'w')
         maxFile.write(str(maxfreq))
         maxFile.close()
 
@@ -357,8 +361,12 @@ def set_min_cpu_freq(minfreq, cpurange):
     for x in cpurange:
         minName = "/sys/devices/system/cpu/cpu" + \
             str(x) + "/cpufreq/scaling_min_freq"
+        try:
+            minFile = open(minName, 'w')
+        except OSError:
+            print("Could not open '" + str(minName) + "', skipping.")
+            continue
         print("Writing " + str(minfreq) + " to " + minName)
-        minFile = open(minName, 'w')
         minFile.write(str(minfreq))
         minFile.close()
 
@@ -367,30 +375,36 @@ def set_cpu_freq(setfreq, cpurange):
     for x in cpurange:
         setName = "/sys/devices/system/cpu/cpu" + \
             str(x) + "/cpufreq/scaling_setspeed"
-        print("Writing " + str(setfreq) + " to " + setName)
-        minFile = open(setName, 'r')
+        try:
+            minFile = open(setName, 'r+')
+        except OSError:
+            print("Could not open '" + str(setName) + "', skipping.")
+            continue
         current = minFile.readline().strip("\n")
-        minFile.close()
         if current == "<unsupported>":
             print("Error, cannot set frequency for core " +
                   str(x) + " " + current + " Need '-g userspace'")
         else:
-            minFile = open(setName, 'w')
+            print("Writing " + str(setfreq) + " to " + setName)
             minFile.write(str(setfreq))
-            minFile.close()
+        minFile.close()
 
 
 def set_governor(gov, cpurange):
     for x in cpurange:
         govName = "/sys/devices/system/cpu/cpu" + \
             str(x) + "/cpufreq/scaling_governor"
+        try:
+            govFile = open(govName, 'w')
+        except OSError:
+            print("Could not open '" + str(govName) + "', skipping.")
+            continue
         print("Writing '" + str(gov) + "' to " + govName)
-        govFile = open(govName, 'w')
         govFile.write(str(gov))
         govFile.close()
 
 
-def set_cstate(cstate, enable, cpurange):
+def set_cstate(cstate, disable, cpurange):
 
     # Get list of cstate dirs to iterate through to find the cstate name
     cstates = os.listdir("/sys/devices/system/cpu/cpu0/cpuidle")
@@ -402,9 +416,13 @@ def set_cstate(cstate, enable, cpurange):
             if (name == cstate):
                 stateName = "/sys/devices/system/cpu/cpu" + \
                     str(x) + "/cpuidle/" + str(y) + "/disable"
-                print("Writing '" + str(enable) + "' to " + stateName)
-                stateFile = open(stateName, 'w')
-                stateFile.write(str(enable))
+                try:
+                    stateFile = open(stateName, 'w')
+                except OSError:
+                    print("Could not open '" + str(stateName) + "', skipping.")
+                    continue
+                print("Writing '" + str(disable) + "' to " + stateName)
+                stateFile.write(str(disable))
                 stateFile.close()
 
 def getPkgId(core_id):
@@ -596,7 +614,7 @@ def show_help():
     print('3. Set governor to userspace, core 1, set freq to Turbo Boost')
     print('   this assumes there\'s a 2501 and a 2500 freq available.')
     print()
-    print('   ' + scriptname + ' -g ondemand -r 2,4 -M 2501, -s 2501')
+    print('   ' + scriptname + ' -g userspace -r 1 -M 2501 -s 2501')
     print()
 
 
