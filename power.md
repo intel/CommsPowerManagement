@@ -8,7 +8,7 @@ Linux kernel /proc file system interface.
 # Additional Setup Notes
 
 This script works with both acpi-cpufreq and intel_pstate drivers, although
-functionality may be slightly different between them. If you wish to to
+functionality may be slightly different between them. If you wish to
 disable the intel_pstate kernel driver, we need to
 add `intel_pstate=disable` to the kernel boot parameters. Typically this is
 done by editing `/boot/grub2/grub.cfg` or `/etc/default/grub`, and adding
@@ -19,6 +19,13 @@ different operating systems).
 GRUB_CMDLINE_LINUX_DEFAULT="net.ifnames=0 intel_pstate=disable ..."
 ```
 
+After making updates, a new grub file needs to be generated and a reboot
+is required. For example, on Ubuntu:
+```bash
+update-grub
+reboot
+```
+
 # Use case for Performance
 
 Certain cores may need more performance than others, so in this case those
@@ -27,7 +34,7 @@ at P1 (or lower). P1 is the maximum non-turbo frequency.
 
 # Use case for Power Saving
 
-When using applications using DPDK, the mechanisms for passing packets around
+For applications utilizing DPDK, the mechanisms for passing packets around
 a system usually involves busy polling, which the intel_pstate driver sees
 as 100% busy and will be unable to scale down the frequency of any of the
 cores to save power. In this case it is possible to use the userspace
@@ -76,7 +83,7 @@ Examples:
 3. Set governor to userspace, core 1, set freq to Turbo Boost
    this assumes there's a 2501 and a 2500 freq available.
 
-   /usr/local/bin/power.py -g ondemand -r 2,4 -M 2501, -s 2501
+   /usr/local/bin/power.py -g userspace -r 1 -M 2501 -s 2501
 ```
 
 When executing the script without any command line parameters, the user is
@@ -103,7 +110,7 @@ Option:
 ```
 
 The first two menu options are informational, one giving the available
-settings, and the other displaying a table with the current sustem settings.
+settings, and the other displaying a table with the current system settings.
 
 [1] Display Available Settings
 ```bash
@@ -116,6 +123,7 @@ Available C-States: ['POLL', 'C1-SKX', 'C1E-SKX', 'C6-SKX']
 
 Press enter to continue ...
 ```
+_Note: The output produced varies based on system configuration, not all governors will always be available._
 
 [2] Display Current Settings
 ```bash

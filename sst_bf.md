@@ -35,9 +35,9 @@ presented with help text (frequencies may vary for different CPUs):
 # Description of options
 [-s] This is the recommended setting for deterministic workloads and SST-BF. The frequency is set and fixed to a value on each of the high and normal priority cores. This is the standard recommended SST-BF configuration. The min and max of each core is set to avoid performance variation associated with frequency changing up or down. 
 
-[-m] This sets all cores on the server to the out of the box/P1 frequency. This is useful to unset the two tiers of SST-BF frequency and fix all the cores frequency to the marked frequency of the CPU. When using SST-BF CPU P states is enabled and introduces frequency scaling and using this script option avoid performance varation associated with frequency changing up or down. This is equivalent to disabling P States and the associated frequency scaling.
+[-m] This sets all cores on the server to the out of the box/P1 frequency. This is useful to unset the two tiers of SST-BF frequency and fix all the cores frequency to the marked frequency of the CPU. When using SST-BF CPU P states are enabled and trigger frequency scaling, using this script option avoids the performance varation associated with frequency changing up or down. This is equivalent to disabling P States and the associated frequency scaling.
 
-[-r] This option reverts the CPU to and out of the box configuration where Intel Turbo Boost is enabled (up to max turbo frequency). SST-BF depends on Turbo and P states enabled in BIOS. The range of frequency is lowest P state to highest Turbo frequency. Hence, this is considered the starting configuraiton. The script includes this to allow the user easily revert to the coinfiguraion at boot time prior to SST-BF[-s] or P1 set on all cores[-m]
+[-r] This option reverts the CPU to an out-of-the-box configuration where Intel Turbo Boost is enabled (up to max turbo frequency). SST-BF depends on Turbo and P states being enabled in BIOS. The range of frequency is lowest P state to highest Turbo frequency. Hence, this is considered the starting configuration. The script includes this to allow the user easily revert to the configuration at boot time prior to SST-BF[-s] or P1 set on all cores[-m]
 
 ```bash
 # sst_bf.py -h
@@ -80,7 +80,7 @@ presented with the following menu (frequencies may vary for different CPUs):
 Option:
 ```
 
-Options i, l, n and v give information about the current system configuraion,
+Options i, l, n and v give information about the current system configuration,
 including a list of normal and high priority cores (including a hexadecimal coremask),
 and the version of the script.
 
