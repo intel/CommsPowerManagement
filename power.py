@@ -47,11 +47,13 @@ freq_P1 = 0
 freq_P1n = 0
 PKG_TO_DIE_PATH = {}
 CORE_TO_PKG = {}
-# Read a 64-byte value from an MSR through the sysfs interface.
-# Returns an 8-byte binary packed string.
 
 
 def rdmsr(core, msr):
+    """
+    Read a 64-byte value from an MSR through the sysfs interface.
+    Returns an 8-byte binary packed string.
+    """
     try:
         msr_filename = os.path.join("/dev/cpu/", str(core), "msr")
         msr_file = os.open(msr_filename, os.O_RDONLY)
@@ -61,9 +63,12 @@ def rdmsr(core, msr):
     except (IOError, OSError) as err:
         raise IOError(f"{err}: Could not read MSR 0x{msr} on core {core}")
 
-# Writes a 64-byte value to an MSR through the sysfs interface.
-# Expects an 8-byte binary packed string in regstr.
+
 def wrmsr(core, msr, regstr):
+    """
+    Writes a 64-byte value to an MSR through the sysfs interface.
+    Expects an 8-byte binary packed string in regstr.
+    """
     try:
         msr_filename = os.path.join("/dev/cpu", str(core), "msr")
         with open(msr_filename, "wb") as msr_file:
@@ -89,7 +94,7 @@ def check_driver():
 
     try:
         drvFile = open(DRV_FILE, 'r')
-    except:
+    except IOError:
         print()
         print("ERROR: No pstate driver file found.")
         print("       Are P-States enabled in the system BIOS?")
@@ -151,6 +156,7 @@ def get_pstates():
     freqs.sort(reverse=True)
     return freqs
 
+
 def show_pstates():
     freq_list = get_pstates()
     print(" Available P-States: " + str(freq_list))
@@ -159,7 +165,8 @@ def show_pstates():
         print("    Turbo Available: Yes (use pstate '" +
               str(freq_list[0]) + "')")
     elif freq_P0 > freq_P1:
-        print("    Turbo Available: Yes (any pstate above '" + str(freq_P1) + "')")
+        print("    Turbo Available: Yes (any pstate above '" +
+              str(freq_P1) + "')")
     else:
         print("    Turbo Available: No")
     return freq_list
@@ -169,10 +176,10 @@ def get_cstates():
     stateList = []
     try:
         states = os.listdir("/sys/devices/system/cpu/cpu0/cpuidle/")
-    except:
+    except OSError:
         states = ""
     for state in states:
-        stateFileName = "/sys/devices/system/cpu/cpu0/cpuidle/" + state + "/name"
+        stateFileName = f'/sys/devices/system/cpu/cpu0/cpuidle/{state}/name'
         stateFile = open(stateFileName, 'r')
         statename = stateFile.readline().strip("\n")
         stateList.append(statename)
@@ -221,6 +228,7 @@ def getfileval(stateFileName):
     with open(stateFileName, 'r') as state_file:
         return state_file.readline().strip("\n")
 
+
 def writetofile(val, stateFileName):
     with open(stateFileName, 'w') as state_file:
         state_file.write(val)
@@ -235,16 +243,18 @@ def get_min_max_uncore_freq_msr(core_id):
         # Byte 1 contains the max non-turbo frequecy
         uncore_max = msr_bytes[0]*100
         uncore_min = msr_bytes[1]*100
-        return uncore_min,uncore_max
+        return uncore_min, uncore_max
     except(IOError, OSError):
-        return 0,0
+        return 0, 0
 
 
 def show_uncore_freqs():
     """ Show available uncore freqs from sysfs/MSR."""
     try:
-        init_min_path = os.path.join(UNCORE_PATH, PKG0_DIE0_PATH, UNCORE_INIT_MIN)
-        init_max_path = os.path.join(UNCORE_PATH, PKG0_DIE0_PATH, UNCORE_INIT_MAX)
+        init_min_path = os.path.join(UNCORE_PATH, PKG0_DIE0_PATH,
+                                     UNCORE_INIT_MIN)
+        init_max_path = os.path.join(UNCORE_PATH, PKG0_DIE0_PATH,
+                                     UNCORE_INIT_MAX)
         min = int(getfileval(init_min_path)) // 1000
         max = int(getfileval(init_max_path)) // 1000
     except (IOError, OSError, ValueError):
@@ -260,7 +270,7 @@ def listinfo():
     cpucount = getcpucount()
     try:
         cstates = os.listdir("/sys/devices/system/cpu/cpu0/cpuidle")
-    except:
+    except OSError:
         cstates = ""
     print("")
     print("==== ================================", end='')
@@ -300,14 +310,14 @@ def listinfo():
             pkg_n_die_p = glob.glob(path)
 
             if not pkg_n_die_p:
-                raise IOError("no sysfs entry for uncore_freq control");
+                raise IOError("no sysfs entry for uncore_freq control")
             min_path = os.path.join(pkg_n_die_p[0], UNCORE_MIN)
             max_path = os.path.join(pkg_n_die_p[0], UNCORE_MAX)
 
             uncore_min = int(getfileval(min_path)) // 1000
             uncore_max = int(getfileval(max_path)) // 1000
         except (IOError, OSError):
-            uncore_min,uncore_max = get_min_max_uncore_freq_msr(x)
+            uncore_min, uncore_max = get_min_max_uncore_freq_msr(x)
         max = getfileval("/sys/devices/system/cpu/cpu" +
                          str(x) + "/cpufreq/scaling_max_freq")
         min = getfileval("/sys/devices/system/cpu/cpu" +
@@ -337,6 +347,7 @@ def getcpus():
     regex = re.compile(r'cpu[0-9]')
     cpus = list(filter(regex.search, cpus))
     return cpus
+
 
 def getcpucount():
     cpucount = len(getcpus())
@@ -425,19 +436,20 @@ def set_cstate(cstate, disable, cpurange):
                 stateFile.write(str(disable))
                 stateFile.close()
 
+
 def getPkgId(core_id):
     try:
         if core_id in CORE_TO_PKG:
-           pkg = CORE_TO_PKG[core_id]
+            pkg = CORE_TO_PKG[core_id]
         else:
-           pkgId = os.path.join(CPU_PATH, f"cpu{core_id}/", TOPO_PKG)
-           pkg = getfileval(pkgId)
-           CORE_TO_PKG[core_id] = pkg
-
+            pkgId = os.path.join(CPU_PATH, f"cpu{core_id}/", TOPO_PKG)
+            pkg = getfileval(pkgId)
+            CORE_TO_PKG[core_id] = pkg
         return pkg
     except (IOError, OSError) as err:
-        print (f"{err}")
+        print(f"{err}")
         return None
+
 
 def get_sysfs_die_path(pkg):
 
@@ -457,6 +469,7 @@ def get_sysfs_die_path(pkg):
         raise IOError("uncore_freq sysfs not available")
 
     return die_path
+
 
 def set_uncore_max_msr(uncore_freq, cpurange):
     """Set user passed uncore frequency as max freq using MSR."""
@@ -507,7 +520,7 @@ def set_uncore_min_msr(uncore_freq, cpurange):
                                        data[7])
             wrmsr(core_id, MSR_UNCORE_RATIO_LIMIT, write_regstr)
         except (IOError, OSError) as err:
-            print (f"{err}:Could not set min uncore on core {core_id}")
+            print(f"{err}:Could not set min uncore on core {core_id}")
 
 
 def set_uncore_min_sysfs(uncore_freq, cpurange):
@@ -521,6 +534,7 @@ def set_uncore_min_sysfs(uncore_freq, cpurange):
             writetofile(str(uncore_freq * 1000), min_path)
         except (IOError, OSError) as err:
             raise IOError(f"{err}: Try setting using MSR on core {core_id}")
+
 
 def validate_uncore_freq(package, uncore_freq):
     try:
@@ -536,12 +550,12 @@ def validate_uncore_freq(package, uncore_freq):
     sup_uncore_freqs = list(range(min_freq, max_freq+100, 100))
     if uncore_freq not in sup_uncore_freqs:
         raise ValueError(f"Invalid uncore freq {uncore_freq}, "
-                        f"should be between {min_freq}Mhz-{max_freq}Mhz")
+                         f"should be between {min_freq}Mhz-{max_freq}Mhz")
 
 
 def set_uncore_freq(cpurange, min_freq=None, max_freq=None):
     pkgs = set(getPkgId(c) for c in cpurange)  # get all packages in cpu range
-    freqs = list(filter(None, (min_freq, max_freq)))  # get list of valid frequencies
+    freqs = list(filter(None, (min_freq, max_freq)))  # get list of valid freqs
 
     for p in pkgs:
         for f in freqs:
@@ -559,6 +573,7 @@ def set_uncore_freq(cpurange, min_freq=None, max_freq=None):
         except (IOError, OSError):
             set_uncore_max_msr(max_freq, cpurange)
 
+
 def range_expand(s):
     try:
         r = []
@@ -572,17 +587,19 @@ def range_expand(s):
     except ValueError:
         return None
 
+
 def validate_cores(cores):
     cores_range = range_expand(cores)
     if not cores_range:
-       raise ValueError("Invalid core range")
+        raise ValueError("Invalid core range")
     cpus = getcpus()
     # check if there are invalid cores in the core list
     diff = set(cores_range).difference(set(range(len(cpus))))
     if diff:
-       raise ValueError("Invalid core range: cores {} do"
+        raise ValueError("Invalid core range: cores {} do"
                          " not exist".format(list(diff)))
     return cores_range
+
 
 def show_help():
     print("")
@@ -667,16 +684,16 @@ def do_menu():
     print("----------------------------------------------------------")
     text = raw_input("Option: ")
 
-    #("[1] Display Available Settings")
+    # ("[1] Display Available Settings")
     if (text == "1"):
         getinfo()
-    #("[2] Display Current Settings")
+    # ("[2] Display Current Settings")
     elif (text == "2"):
         listinfo()
-    #("[3] Display Available P-States")
+    # ("[3] Display Available P-States")
     elif (text == "3"):
         show_pstates()
-    #print("[4] Set P-State governor for a range of cores")
+    # print("[4] Set P-State governor for a range of cores")
     elif (text == "4"):
         governor = input_governor()
         if (governor == ""):
@@ -686,7 +703,7 @@ def do_menu():
         cpurange = range_expand(cores)
         print("Working with cores: " + str(cpurange))
         set_governor(governor, cpurange)
-    #("[5] Set Maximum P-State for a range of cores")
+    # ("[5] Set Maximum P-State for a range of cores")
     elif (text == "5"):
         freqs = show_pstates()
         pstate = raw_input("Input P-State: ")
@@ -698,7 +715,7 @@ def do_menu():
         cpurange = range_expand(cores)
         print("Working with cores: " + str(cpurange))
         set_max_cpu_freq(str(int(pstate)*1000), cpurange)
-    #("[6] Set Minimum P-State for a range of cores")
+    # ("[6] Set Minimum P-State for a range of cores")
     elif (text == "6"):
         freqs = show_pstates()
         pstate = raw_input("Input P-State: ")
@@ -711,10 +728,10 @@ def do_menu():
         print("Working with cores: " + str(cpurange))
         set_min_cpu_freq(str(int(pstate)*1000), cpurange)
 
-    #("[7] Display Available C-States")
+    # ("[7] Display Available C-States")
     elif (text == "7"):
         show_cstates()
-    #("[8] Enable C-State for a range of cores")
+    # ("[8] Enable C-State for a range of cores")
     elif (text == "8"):
         cstate = input_cstate()
         if (cstate == ""):
@@ -724,7 +741,7 @@ def do_menu():
         cpurange = range_expand(cores)
         print("Working with cores: " + str(cpurange))
         set_cstate(cstate, 0, cpurange)
-    #("[9] Disable C-State for a range of cores")
+    # ("[9] Disable C-State for a range of cores")
     elif (text == "9"):
         cstate = input_cstate()
         if (cstate == ""):
@@ -734,10 +751,10 @@ def do_menu():
         cpurange = range_expand(cores)
         print("Working with cores: " + str(cpurange))
         set_cstate(cstate, 1, cpurange)
-    #("[10] Set Uncore Maximum for a range of cores")
+    # ("[10] Set Uncore Maximum for a range of cores")
     elif text == "10":
         freqs = show_uncore_freqs()
-    #("[11] Set Uncore Maximum for a range of cores")
+    # ("[11] Set Uncore Maximum for a range of cores")
     elif text == "11":
         freqs = show_uncore_freqs()
         unfreq = raw_input("Input UncoreFreq: ")
@@ -748,7 +765,7 @@ def do_menu():
             set_uncore_freq(cpurange, max_freq=int(unfreq))
         except ValueError as err:
             print(err)
-    #("[12] Set Uncore Minimum for a range of cores")
+    # ("[12] Set Uncore Minimum for a range of cores")
     elif text == "12":
         freqs = show_uncore_freqs()
         unfreq = raw_input("Input UncoreFreq: ")
@@ -759,10 +776,10 @@ def do_menu():
             set_uncore_freq(cpurange, min_freq=int(unfreq))
         except ValueError as err:
             print(err)
-    #("[h] Show Help Text")
+    # ("[h] Show Help Text")
     elif (text == "h"):
         show_help()
-    #("[q] Exit Script")
+    # ("[q] Exit Script")
     elif (text == "q"):
         sys.exit(0)
     else:
@@ -849,7 +866,7 @@ for opt, arg in opts:
             set_cpu_freq(setfreq, cpurange)
         else:
             print()
-            print("Error: setspeed not supported without acpi-cpufreq driver. Please")
-            print("       add 'intel_pstate=disable' to kernel boot parameters,")
-            print("       or use maxfreq and minfreq together.")
+            print("Error: setspeed not supported without acpi-cpufreq driver.")
+            print("       Please add 'intel_pstate=disable' to kernel boot")
+            print("       parameters, or use maxfreq and minfreq together.")
             print()
