@@ -74,7 +74,14 @@ hosts: webservers
   . Use either of the below inventory files to define target servers information.
     ansible/playbooks/inventory/hosts
 
-  . Run `lowlatency` provisioning as below
+  . Run `lowlatency` provisioning as below. The `lowlatency` profile is to configure
+    the system for measuring latency of the workloads with minimum jitter. This profile
+    configures the system with low jitter boot parameters
+    (defined inside `ansible/roles/commspower-platform-provisioning/defaults`)
+    and reboots it. It also configures the power management features like uncore frequency
+    and C-states. It fixes the uncore frequency and disables the C-states on the system to
+    avoid the jitter caused by uncore frequency changes and C-state exit latencies.
+
   ```
   ansible-playbook -i <inventory file> <playbook>
   Example: ansible-playbook  -i ansible/playbooks/inventory/hosts ansible/playbooks/deploy-lowlatency.yml
