@@ -113,9 +113,6 @@ def check_driver():
             sys.exit(1)
         print()
 
-        print("WARNING: Current pstate driver is '" + driver + "'")
-        print("         Some options may be unavailable.")
-        print()
         # get the P1 frequency
         freq_P1 = get_cpu_base_frequency(11)
         print("CPU Base Frequency (P1): " + str(freq_P1) + "MHz")
