@@ -102,27 +102,19 @@ def check_driver():
         return 0
     driver = drvFile.readline().strip("\n")
     drvFile.close()
-    if driver == "acpi-cpufreq":
-        return 1
-    elif driver == "intel_pstate":
-        try:
-            open(MSR_FILE, "r")
-        except IOError:
-            print("ERROR: Need the 'msr' kernel module")
-            print("Please run 'modprobe msr'")
-            sys.exit(1)
-        print()
 
-        # get the P1 frequency
-        freq_P1 = get_cpu_base_frequency(11)
-        print("CPU Base Frequency (P1): " + str(freq_P1) + "MHz")
-        return 1
-    else:
-        print()
-        print("WARNING: Current pstate driver is '" + driver + "'")
-        print("         Some options may be unavailable.")
-        print()
-        return 1
+    print("Current pstate driver is '" + driver + "'")
+
+    try:
+        open(MSR_FILE, "r")
+    except IOError:
+        print("ERROR: Need the 'msr' kernel module")
+        print("Please run 'modprobe msr'")
+        sys.exit(1)
+    # get the P1 frequency
+    freq_P1 = get_cpu_base_frequency(11)
+    print("CPU Base Frequency (P1): " + str(freq_P1) + "MHz")
+    return 1
 
 
 def get_pstates():
