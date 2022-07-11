@@ -597,8 +597,8 @@ def show_help():
     print('   -h            Show this help')
     print('   -i            Show information on available freqs, C-States, etc')
     print('   -l            List information on each core')
-    print('   -M <freq>     Set core maximum frequency')
-    print('   -m <freq>     Set core minimum frequency')
+    print('   -M <freq>/max     Set core maximum frequency')
+    print('   -m <freq>/max     Set core minimum frequency')
     print('   -s <freq>     Set core frequency (within min and max)')
     print('   -r <range>    Range of cores to affect, e.g. 1-3,5,7')
     print('   -g <governor> Set core governor (usually \'userspace\')')
@@ -816,10 +816,20 @@ for opt, arg in opts:
 
 for opt, arg in opts:
     if opt in ("-M", "--maxfreq"):
-        setfreq = int(arg) * 1000
+        setfreq = None
+        if arg.lower() == "max": 
+            setfreq = max(get_pstates()) * 1000
+            print(f"Setting maxfreq to: {setfreq}")
+        else:
+            setfreq = int(arg) * 1000
         set_max_cpu_freq(setfreq, cpurange)
     if opt in ("-m", "--minfreq"):
-        setfreq = int(arg) * 1000
+        setfreq = None
+        if arg.lower() == "max":
+            setfreq = max(get_pstates()) * 1000
+            print(f"Setting minfreq to: {setfreq}")
+        else:
+            setfreq = int(arg) * 1000
         set_min_cpu_freq(setfreq, cpurange)
     if opt in ("-g", "--governor"):
         set_governor(arg, cpurange)
