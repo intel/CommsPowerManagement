@@ -185,26 +185,6 @@ def get_issbf_cpu_freqs():
             p1_high = base
     return (p1_high, p1_normal)
 
-# read CPUID to get CPU Name
-def get_cpu_name():
-    """Get the CPU name from the list of valid SST_BF CPUs"""
-
-    valid_cpus = ["6252N", "6230N", "5218N"]
-
-    pargs = ["lscpu"]
-    try:
-        output = subprocess.check_output(pargs).decode()
-    except (subprocess.CalledProcessError, OSError):
-        print("Failed to get CPU information: 'cpuid' package not installed.")
-        return ""
-
-    for line in output.splitlines():
-        for name in valid_cpus:
-            if name in line:
-                return name
-
-    return ""
-
 def check_driver():
     """check the name of the P-STATE driver"""
 
@@ -487,10 +467,6 @@ if check_driver() == 0:
     sys.exit(1)
 
 CPU_COUNT = getcpu_count()
-CPU_NAME = get_cpu_name()
-if CPU_NAME == "":
-    print("Unknown CPU")
-    sys.exit(-1)
 
 ONLINE_CORES = list(filter(__is_online, range(0, CPU_COUNT)))
 
