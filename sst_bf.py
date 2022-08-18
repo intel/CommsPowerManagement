@@ -293,7 +293,6 @@ def sst_bf_enabled():
 def query_sst_bf():
     """"Show information on sst-bf frequencies."""
 
-    print("Name = " + CPU_NAME)
     print("CPUs = " + str(CPU_COUNT))
 
     freq_p1 = get_cpu_base_frequency()
