@@ -142,6 +142,22 @@ hosts: webservers
         - 9
  ```
 
+ ```waitpkg```
+
+ This profile configures the WAITPKG instructions on a supported platform.
+ It enables the C0.2 state and sets the max. wait time in TSC ticks to the value
+ specified in `defaults/main.yml`. The configuration is done using SYSFS interface
+ in `/sys/devices/system/cpu/umwait_control` or via MSR if SYSFS interface is not
+ availabe. The `tsx=on` parameter should be added to the list of GRUB kernel
+ parameters in `grub_cmd_line_args` variable in order to enable monitoring
+ of multiple addresses. Parameters that are not required may be removed.
+ The playbook will check whether the parameter is present in currently running
+ kernel. If not, the playbook will reconfigure the GRUB entry and reboot into
+ the reconfigured kernel. To apply the configuration run the following:
+ ```
+ ansible-playbook -i ansible/playbooks/inventory/hosts ansible/playbooks/deploy-waitpkg.yml
+ ```
+
   ```
   ansible-playbook -i <inventory file> <playbook>
   Example: ansible-playbook  -i ansible/playbooks/inventory/hosts ansible/playbooks/deploy-powerupdown.yml

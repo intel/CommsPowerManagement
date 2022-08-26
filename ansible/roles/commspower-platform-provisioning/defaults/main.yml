@@ -93,3 +93,11 @@ clx_type: Intel(R) Xeon(R) Gold 6230N CPU @ 2.30GHz
 prov_status_dir: /var/run/intel/platform-provisioning
 
 cpu_path: /sys/devices/system/cpu
+
+# WAITPKG sysfs control paths
+umwait_sys_path: /sys/devices/system/cpu/umwait_control
+umwait_control_max_time_syspath: max_time
+umwait_control_c02_enable_syspath: enable_c02
+
+# maximum number of TSC ticks for WAITPKG instructions (set to 0 to unlimited)
+waitpkg_max_time_ticks: 100000

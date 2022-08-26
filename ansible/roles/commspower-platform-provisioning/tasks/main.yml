@@ -10,9 +10,13 @@
 - include_tasks: powersaving.yml
   when: state == "powersaving"
 
-  # Power saving provissioning
+# Power saving provissioning
 - include_tasks: lowpower.yml
   when: state == "lowpower"
 
 - include_tasks: very-lowpower.yml
   when: state == "very-lowpower"
+
+# WAITPKG provisioning
+- include_tasks: configure_waitpkg.yml
+  when: state == "waitpkg"

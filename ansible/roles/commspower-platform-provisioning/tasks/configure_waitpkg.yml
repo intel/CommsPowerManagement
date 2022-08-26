@@ -1,0 +1,92 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright(c) 2022-23 Intel Corporation
+
+---
+
+- import_tasks: check_waitpkg_platform_support.yml
+
+- name: Check if TSX is enabled
+  command: grep -q -i "tsx=on" /proc/cmdline
+  register: tsx_active
+  changed_when: tsx_active.rc != 0
+  failed_when: false
+  check_mode: no
+
+- name: Fail if TSX switch is not present in ansible GRUB config
+  fail:
+    msg: "Cannot reconfigure GRUB to activate TSX. Missing \"tsx=on\" in grub_cmdline_add_args in defaults/main.yml."
+  check_mode: no
+  changed_when: false
+  when: tsx_active.rc != 0 and grub_cmdline_add_args is not contains('tsx=on')
+
+- name: Add tsx=on kernel parameter in GRUB if needed
+  include_tasks: update_grub_reboot.yml
+  when: tsx_active.rc != 0
+
+- name: Validate waitpkg_max_time_ticks value in defaults/main.yml
+  fail:
+    msg: waitpkg_max_time_ticks value must be divisble by 4
+  when: waitpkg_max_time_ticks % 4 != 0
+
+- name: Check availability of WAITPKG sysfs interface
+  stat:
+    path: "{{ umwait_sys_path }}"
+  register: umwait_control_paths
+  ignore_errors: yes
+  check_mode: no
+
+- debug:
+    msg: "{{ umwait_control_paths }}"
+  when: ansible_check_mode
+
+- name: Configure WAITPKG using SYSFS
+  block:
+    - name: Read the max_time value
+      command: cat "{{ umwait_sys_path }}/{{ umwait_control_max_time_syspath }}"
+      changed_when: false
+      register: umwait_max_time
+      check_mode: no
+
+    - debug:
+        msg:
+          - "Current max_time: {{ umwait_max_time.stdout }}"
+          - "Config max_time: {{ waitpkg_max_time_ticks }}"
+      when: ansible_check_mode
+
+    - name: Write max_time value if different from configuration (SYSFS)
+      shell: >
+        echo "{{ waitpkg_max_time_ticks }}"
+        | tee "{{ umwait_sys_path }}/{{ umwait_control_max_time_syspath }}"
+      when: waitpkg_max_time_ticks != umwait_max_time.stdout | int
+
+    - name: Enable C0.2 sleep state
+      shell: >
+        echo 1
+        | tee "{{ umwait_sys_path }}/{{ umwait_control_c02_enable_syspath }}"
+  when: umwait_control_paths.stat.exists
+
+- name: Configure WAITPKG using MSR tools
+  block:
+    - name: Read the max_time value (MSR)
+      command: rdmsr -f 31:2 -u 0xe1
+      register: umwait_max_time
+      changed_when: false
+      check_mode: no
+
+    - debug:
+        msg:
+          - "Current max_time: {{ umwait_max_time.stdout | int * 4 }}"
+          - "Config max_time: {{ waitpkg_max_time_ticks }}"
+      when: ansible_check_mode and umwait_max_time.rc == 0
+
+    # writing just the value waitpkg_max_time_ticks forces enabling of
+    # C0.2 state (waitpkg_max_time_ticks must be divisible by 4
+    # which also unsets the "Disable C0.2" bit)
+    - name: Write max_time value if different from configuration (MSR)
+      shell: >
+        wrmsr -a 0xe1 $(printf '0x%x'
+        {{ waitpkg_max_time_ticks
+        if waitpkg_max_time_ticks != (umwait_max_time.stdout | int * 4)
+        else umwait_max_time.stdout | int * 4 }})
+
+  when: not umwait_control_paths.stat.exists
