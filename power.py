@@ -597,8 +597,8 @@ def show_help():
     print('   -h            Show this help')
     print('   -i            Show information on available freqs, C-States, etc')
     print('   -l            List information on each core')
-    print('   -M <freq>     Set core maximum frequency. Can also use keyword "max" to setup max p_state')
-    print('   -m <freq>     Set core minimum frequency. Can also use keyword "max" to setup max p_state')
+    print('   -M <freq>     Set core maximum frequency. Can also use "max", "min", or "base"')
+    print('   -m <freq>     Set core minimum frequency. Can also use "max", "min", or "base"')
     print('   -s <freq>     Set core frequency (within min and max)')
     print('   -r <range>    Range of cores to affect, e.g. 1-3,5,7')
     print('   -g <governor> Set core governor (usually \'userspace\')')
@@ -817,19 +817,27 @@ for opt, arg in opts:
 for opt, arg in opts:
     if opt in ("-M", "--maxfreq"):
         setfreq = None
-        if arg.lower() == "max": 
+        if arg.lower() == "max":
             setfreq = max(get_pstates()) * 1000
-            print(f"Setting maxfreq to: {setfreq}")
+        elif arg.lower() == "min":
+            setfreq = min(get_pstates()) * 1000
+        elif arg.lower() == "base":
+            setfreq = get_cpu_base_frequency(0) * 1000
         else:
             setfreq = int(arg) * 1000
+        print(f"Setting maxfreq to: {setfreq}")
         set_max_cpu_freq(setfreq, cpurange)
     if opt in ("-m", "--minfreq"):
         setfreq = None
         if arg.lower() == "max":
             setfreq = max(get_pstates()) * 1000
-            print(f"Setting minfreq to: {setfreq}")
+        elif arg.lower() == "min":
+            setfreq = min(get_pstates()) * 1000
+        elif arg.lower() == "base":
+            setfreq = get_cpu_base_frequency(0) * 1000
         else:
             setfreq = int(arg) * 1000
+        print(f"Setting minfreq to: {setfreq}")
         set_min_cpu_freq(setfreq, cpurange)
     if opt in ("-g", "--governor"):
         set_governor(arg, cpurange)
