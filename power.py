@@ -30,6 +30,7 @@ UNCORE_INIT_MIN = "initial_min_freq_khz"
 UNCORE_INIT_MAX = "initial_max_freq_khz"
 UNCORE_MIN = "min_freq_khz"
 UNCORE_MAX = "max_freq_khz"
+TURBO_PATH = "/sys/devices/system/cpu/intel_pstate/no_turbo"
 CPU_PATH = "/sys/devices/system/cpu/"
 TOPO_PKG = "topology/physical_package_id"
 PKG0_DIE0_PATH = "package_00_die_00"
@@ -47,6 +48,11 @@ freq_P1 = 0
 freq_P1n = 0
 PKG_TO_DIE_PATH = {}
 CORE_TO_PKG = {}
+
+
+def getfileval(stateFileName):
+    with open(stateFileName, 'r') as state_file:
+        return state_file.readline().strip("\n")
 
 
 def rdmsr(core, msr):
@@ -152,10 +158,18 @@ def show_pstates():
 
     if (freq_list[0]-1 == freq_list[1]):
         print("    Turbo Available: Yes (use pstate '" +
-              str(freq_list[0]) + "')")
+              str(freq_list[0]) + "')", end='')
+        if int(getfileval(TURBO_PATH)) == 0:
+            print(": Enabled")
+        else:
+            print(": Disabled")
     elif freq_P0 > freq_P1:
         print("    Turbo Available: Yes (any pstate above '" +
-              str(freq_P1) + "')")
+              str(freq_P1) + "')", end='')
+        if int(getfileval(TURBO_PATH)) == 0:
+            print(": Enabled")
+        else:
+            print(": Disabled")
     else:
         print("    Turbo Available: No")
     return freq_list
@@ -213,9 +227,6 @@ def getinfo():
     show_cstates()
 
 
-def getfileval(stateFileName):
-    with open(stateFileName, 'r') as state_file:
-        return state_file.readline().strip("\n")
 
 
 def writetofile(val, stateFileName):
@@ -253,6 +264,13 @@ def show_uncore_freqs():
     uncore_freqs = list(reversed(range(min, max+1, 100)))
     print(" Available uncore freqs: " + str(uncore_freqs))
     return uncore_freqs
+
+def set_turbo(val):
+    """This function enable or disable the turbo."""
+    try:
+        writetofile(str(val), TURBO_PATH)
+    except (IOError, OSError, ValueError) as err:
+        print(f"{err}: failed to enable or disable the turbo")
 
 
 def listinfo():
@@ -606,6 +624,8 @@ def show_help():
     print('   -d <cstate>   Disable core C-State ')
     print('   -U <freq>     Set uncore maximum frequency')
     print('   -u <freq>     Set uncore minimum frequency')
+    print('   -T            Enable Turbo')
+    print('   -t            Disable Turbo')
     print()
     print('Examples:')
     print()
@@ -667,6 +687,9 @@ def do_menu():
     print("[10] Display Available Uncore Freqs")
     print("[11] Set Uncore Maximum for a range of cores")
     print("[12] Set Uncore Minimum for a range of cores")
+    print("")
+    print("[13] Enable Turbo")
+    print("[14] Disable Turbo")
     print("")
     print("[h] Show Help Text")
     print("[q] Exit Script")
@@ -765,6 +788,14 @@ def do_menu():
             set_uncore_freq(cpurange, min_freq=int(unfreq))
         except ValueError as err:
             print(err)
+    # ("[13] Enable the turbo")
+    elif text == "13":
+        print("Enabling Turbo")
+        set_turbo(0)
+    # ("[14] Disable the turbo")
+    elif text == "14":
+        print("Disabling Turbo")
+        set_turbo(1)
     # ("[h] Show Help Text")
     elif (text == "h"):
         show_help()
@@ -781,7 +812,7 @@ if (check_driver() == 0):
     sys.exit(1)
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "hilM:m:r:s:g:e:d:U:u:", [
+    opts, args = getopt.getopt(sys.argv[1:], "hilM:m:r:s:g:e:d:U:u:Tt", [
                                "maxfreq=", "minfreq=", "range="])
 except getopt.GetoptError:
     print('d.py -x <maxfreq>')
@@ -861,7 +892,12 @@ for opt, arg in opts:
             set_uncore_freq(cpurange, min_freq=int(arg))
         except ValueError as err:
             print(err)
-
+    if opt in "-T":
+        print("Enabling Turbo")
+        set_turbo(0)
+    if opt in "-t":
+        print("Disabling Turbo")
+        set_turbo(1)
 for opt, arg in opts:
     if opt in ("-s", "--setfreq"):
 
