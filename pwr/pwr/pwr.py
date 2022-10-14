@@ -347,7 +347,7 @@ class CPU(object):
         self.highest_freq = None            # single core turbo frequency
         self.lowest_freq = None             # lowest active frequency
         self.uncore_hw_max = 2400           # max available uncore frequency
-        self.uncore_hw_min = 1200           # min available uncore frequency
+        self.uncore_hw_min = 800            # min available uncore frequency
         self.power_consumption = None       # power consumption since last update
         self.tdp = None                     # max possible power consumption
         self.freq_budget = None             # Frequency budget for stable performance
@@ -645,11 +645,13 @@ class CPU(object):
         self.power_consumption = self._get_avg_power_consumption(core)
 
     def _validate_uncore_freq(self, uncore_freq):
-        """ check if uncore_freq is between System's uncore min and max """
-        sup_uncore_freqs = list(range(self.uncore_hw_min, self.uncore_hw_max+100, 100))
-        if uncore_freq not in sup_uncore_freqs:
-            raise ValueError("uncore frequency should be between {}Mhz-{}Mhz".
-                    format(self.uncore_hw_min, self.uncore_hw_max))
+        """ Only check if using sysfs, cannot validate using MSRs alone """
+        if self._uncore_kernel_avail:
+            """ check if uncore_freq is between System's uncore min and max """
+            sup_uncore_freqs = list(range(self.uncore_hw_min, self.uncore_hw_max+100, 100))
+            if uncore_freq not in sup_uncore_freqs:
+                print("uncore frequency {}Mhz should be between {}Mhz-{}Mhz".
+                        format(uncore_freq, self.uncore_hw_min, self.uncore_hw_max))
 
     def _write_sysfs(self):
         """ update uncore min/max using uncore sysfs files """
