@@ -159,17 +159,23 @@ def show_pstates():
     if (freq_list[0]-1 == freq_list[1]):
         print("    Turbo Available: Yes (use pstate '" +
               str(freq_list[0]) + "')", end='')
-        if int(getfileval(TURBO_PATH)) == 0:
-            print(": Enabled")
-        else:
-            print(": Disabled")
+        try:
+            if int(getfileval(TURBO_PATH)) == 0:
+                print(": Enabled")
+            else:
+                print(": Disabled")
+        except (IOError, OSError) as err:
+            print(f"{err}: failed to read turbo status")
     elif freq_P0 > freq_P1:
         print("    Turbo Available: Yes (any pstate above '" +
               str(freq_P1) + "')", end='')
-        if int(getfileval(TURBO_PATH)) == 0:
-            print(": Enabled")
-        else:
-            print(": Disabled")
+        try:
+            if int(getfileval(TURBO_PATH)) == 0:
+                print(": Enabled")
+            else:
+                print(": Disabled")
+        except (IOError, OSError) as err:
+            print(f"{err}: failed to read turbo status")
     else:
         print("    Turbo Available: No")
     return freq_list
@@ -560,8 +566,12 @@ def validate_uncore_freq(package, uncore_freq):
                          f"should be between {min_freq}Mhz-{max_freq}Mhz")
 
 
-def set_uncore_freq(cpurange, min_freq=None, max_freq=None):
-    pkgs = set(getPkgId(c) for c in cpurange)  # get all packages in cpu range
+def set_uncore_freq(min_freq=None, max_freq=None):
+    # Uncore is changed for all cores
+    cpucount = getcpucount()
+    full_cpurange = range_expand('0-' + str(cpucount-1))
+
+    pkgs = set(getPkgId(c) for c in full_cpurange)  # get all packages in cpu range
     freqs = list(filter(None, (min_freq, max_freq)))  # get list of valid freqs
 
     for p in pkgs:
@@ -571,14 +581,14 @@ def set_uncore_freq(cpurange, min_freq=None, max_freq=None):
     # all freqs are validated now, can just set them
     if min_freq:
         try:
-            set_uncore_min_sysfs(min_freq, cpurange)
+            set_uncore_min_sysfs(min_freq, full_cpurange)
         except (IOError, OSError):
-            set_uncore_min_msr(min_freq, cpurange)
+            set_uncore_min_msr(min_freq, full_cpurange)
     if max_freq:
         try:
-            set_uncore_max_sysfs(max_freq, cpurange)
+            set_uncore_max_sysfs(max_freq, full_cpurange)
         except (IOError, OSError):
-            set_uncore_max_msr(max_freq, cpurange)
+            set_uncore_max_msr(max_freq, full_cpurange)
 
 
 def range_expand(s):
@@ -770,22 +780,16 @@ def do_menu():
     elif text == "11":
         freqs = show_uncore_freqs()
         unfreq = raw_input("Input UncoreFreq: ")
-        # Uncore is changed for all cores
-        cpucount = getcpucount()
-        cpurange = range_expand('0-' + str(cpucount-1))
         try:
-            set_uncore_freq(cpurange, max_freq=int(unfreq))
+            set_uncore_freq(max_freq=int(unfreq))
         except ValueError as err:
             print(err)
     # ("[12] Set Uncore Minimum for a range of cores")
     elif text == "12":
         freqs = show_uncore_freqs()
         unfreq = raw_input("Input UncoreFreq: ")
-        # Uncore is changed for all cores
-        cpucount = getcpucount()
-        cpurange = range_expand('0-' + str(cpucount-1))
         try:
-            set_uncore_freq(cpurange, min_freq=int(unfreq))
+            set_uncore_freq(min_freq=int(unfreq))
         except ValueError as err:
             print(err)
     # ("[13] Enable the turbo")
@@ -877,19 +881,13 @@ for opt, arg in opts:
     if opt in ("-d", "--disable"):
         set_cstate(arg, 1, cpurange)
     if opt in ("-U", "--maxUncore"):
-        # Uncore is changed for all cores
-        cpucount = getcpucount()
-        cpurange = range_expand('0-' + str(cpucount-1))
         try:
-            set_uncore_freq(cpurange, max_freq=int(arg))
+            set_uncore_freq(max_freq=int(arg))
         except ValueError as err:
             print(err)
     if opt in ("-u", "--minUncore"):
-        # Uncore is changed for all cores
-        cpucount = getcpucount()
-        cpurange = range_expand('0-' + str(cpucount-1))
         try:
-            set_uncore_freq(cpurange, min_freq=int(arg))
+            set_uncore_freq(min_freq=int(arg))
         except ValueError as err:
             print(err)
     if opt in "-T":
