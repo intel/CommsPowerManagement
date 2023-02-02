@@ -1,0 +1,79 @@
+From e7207152706cce06e1aeecee9b8a63d116a20061 Mon Sep 17 00:00:00 2001
+From: Anatoly Burakov <anatoly.burakov@intel.com>
+Date: Fri, 15 Jul 2022 13:12:45 +0000
+Subject: [PATCH 2/2] eal: add cpuset lcore telemetry entries
+
+Expose per-lcore cpuset information to telemetry.
+
+Signed-off-by: Anatoly Burakov <anatoly.burakov@intel.com>
+---
+ lib/eal/common/eal_common_lcore_telemetry.c | 46 +++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+
+diff --git a/lib/eal/common/eal_common_lcore_telemetry.c b/lib/eal/common/eal_common_lcore_telemetry.c
+index 1478e5a48a..f01ccd9a65 100644
+--- a/lib/eal/common/eal_common_lcore_telemetry.c
++++ b/lib/eal/common/eal_common_lcore_telemetry.c
+@@ -263,6 +263,49 @@ lcore_handle_busyness(const char *cmd __rte_unused,
+ 	return 0;
+ }
+ 
++static int
++lcore_handle_cpuset(const char *cmd __rte_unused,
++		    const char *params __rte_unused,
++		    struct rte_tel_data *d)
++{
++	char corenum[64];
++	int i;
++
++	rte_tel_data_start_dict(d);
++
++	/* Foreach lcore - can't use macro since it excludes ROLE_NON_EAL */
++	for (i = 0; i < RTE_MAX_LCORE; i++) {
++		const struct lcore_config *cfg = &lcore_config[i];
++		const rte_cpuset_t *cpuset = &cfg->cpuset;
++		struct rte_tel_data *ld;
++		unsigned int cpu;
++
++		if (!lcore_enabled(i))
++			continue;
++
++		/* create an array of integers */
++		ld = rte_tel_data_alloc();
++		if (ld == NULL)
++			return -ENOMEM;
++		rte_tel_data_start_array(ld, RTE_TEL_INT_VAL);
++
++		/* add cpu ID's from cpuset to the array */
++		for (cpu = 0; cpu < CPU_SETSIZE; cpu++) {
++			if (!CPU_ISSET(cpu, cpuset))
++				continue;
++			rte_tel_data_add_array_int(ld, cpu);
++		}
++
++		/* add array to the per-lcore container */
++		snprintf(corenum, sizeof(corenum), "%d", i);
++
++		/* tell telemetry library to free this array automatically */
++		rte_tel_data_add_dict_container(d, corenum, ld, 0);
++	}
++
++	return 0;
++}
++
+ void
+ eal_lcore_telemetry_free(void)
+ {
+@@ -289,6 +332,9 @@ RTE_INIT(lcore_init_telemetry)
+ 	rte_telemetry_register_cmd("/eal/lcore/busyness_disable", lcore_busyness_disable,
+ 				   "disable lcore busyness measurement");
+ 
++	rte_telemetry_register_cmd("/eal/lcore/cpuset", lcore_handle_cpuset,
++				   "list physical core affinity for each lcore");
++
+ 	__rte_lcore_telemetry_enabled = true;
+ }
+ 
+-- 
+2.31.1
+
