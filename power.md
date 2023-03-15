@@ -57,18 +57,23 @@ presented with help text:
 ```bash
 # power.py  -h
 
-/usr/local/bin/power.py -i -s <set_freq> -r <range> -g <governor>
+/usr/local/sbin/power.py -i -M <maxfreq> -m <minfreq> -s <setfreq> -r <range> -g <governor>
    <no params>   use interactive menu
    -h            Show this help
    -i            Show information on available freqs, C-States, etc
    -l            List information on each core
-   -M <freq>     Set core maximum frequency
-   -m <freq>     Set core minimum frequency
+   -L <sec>      List information on each core repeatedly at <sec> intervals
+   -M <freq>     Set core maximum frequency. Can also use "max", "min", or "base"
+   -m <freq>     Set core minimum frequency. Can also use "max", "min", or "base"
    -s <freq>     Set core frequency (within min and max)
    -r <range>    Range of cores to affect, e.g. 1-3,5,7
    -g <governor> Set core governor (usually 'userspace')
-   -e <cstate>   Enable any core C-State except C0 (POLL)
-   -d <cstate>   Disable any core C-State except C0 (POLL)
+   -e <cstate>   Enable core C-State
+   -d <cstate>   Disable core C-State
+   -U <freq>     Set uncore maximum frequency
+   -u <freq>     Set uncore minimum frequency
+   -T            Enable Turbo
+   -t            Disable Turbo
 
 Examples:
 
@@ -95,13 +100,21 @@ presented with the following menu:
 [1] Display Available Settings
 [2] Display Current Settings
 
-[3] Set P-State governor for a range of cores
-[4] Set Maximum P-State for a range of cores
-[5] Set Minimum P-State for a range of cores
-[6] Set P-State for a range of cores
+[3] Display Available P-States
+[4] Set P-State governor for a range of cores
+[5] Set Maximum P-State for a range of cores
+[6] Set Minimum P-State for a range of cores
 
-[7] Enable C-State for a range of cores
-[8] Disable C-State for a range of cores
+[7] Display Available C-States
+[8] Enable C-State for a range of cores
+[9] Disable C-State for a range of cores
+
+[10] Display Available Uncore Freqs
+[11] Set Uncore Maximum for a range of cores
+[12] Set Uncore Minimum for a range of cores
+
+[13] Enable Turbo
+[14] Disable Turbo
 
 [h] Show Help Text
 [q] Exit Script
@@ -115,11 +128,14 @@ settings, and the other displaying a table with the current system settings.
 [1] Display Available Settings
 ```bash
 Option: 1
-Available P-States: [2501, 2500, 2400, 2300, 2200, 2100, 2000, 1900, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000]
-Turbo Available (use pstate '2501')
-Number of CPUs: 56
-Available Governors: ['conservative', 'ondemand', 'userspace', 'powersave', 'performance', 'schedutil']
-Available C-States: ['POLL', 'C1-SKX', 'C1E-SKX', 'C6-SKX']
+
+     P-State Driver: intel_pstate
+ CPU Base Frequency: 1900MHz
+ Available P-States: [3600, 3500, 3400, 3300, 3200, 3100, 3000, 2900, 2800, 2700, 2600, 2500, 2400, 2300, 2200, 2100, 2000, 1900, 1800, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000, 900, 800]
+    Turbo Available: Yes (any pstate above '1900'): Enabled
+     Number of CPUs: 64
+Available Governors: ['performance', 'powersave']
+ Available C-States: ['C6', 'C1', 'C1E', 'POLL']
 
 Press enter to continue ...
 ```
@@ -129,33 +145,33 @@ _Note: The output produced varies based on system configuration, not all governo
 ```bash
 Option: 2
 
-==== ====== ====== ====== ========= ======= ======= ======= =======
-              P-STATE INFO                  C-STATES DISABLED?
-Core    Max    Min    Now  Governor    POLL  C1-SKX C1E-SKX  C6-SKX
-==== ====== ====== ====== ========= ======= ======= ======= =======
-   0   2500   1000   1000  ondemand      no     YES     YES     YES
-   1   2500   1000   1000  ondemand      no     YES     YES     YES
-   2   2500   1000   1000  ondemand      no     YES     YES     YES
-   3   2500   1000   1000  ondemand      no     YES     YES     YES
-   4   2500   1000   1000  ondemand      no     YES     YES     YES
-   5   2500   1000   1000  ondemand      no     YES     YES     YES
-   6   2500   1000   1000  ondemand      no     YES     YES     YES
-   7   2500   1000   1000  ondemand      no     YES     YES     YES
-   8   2500   1000   1000  ondemand      no     YES     YES     YES
-   9   2500   1000   1000  ondemand      no     YES     YES     YES
-  10   2500   1000   1000  ondemand      no     YES     YES     YES
-  11   2500   1000   1000  ondemand      no     YES     YES     YES
-  12   2500   1000   1000  ondemand      no     YES     YES     YES
-  13   2500   1000   1000  ondemand      no     YES     YES     YES
-  14   2500   1000   1000  ondemand      no     YES     YES     YES
-  15   2500   1000   1000  ondemand      no     YES     YES     YES
-  16   2500   1000   1000  ondemand      no     YES     YES     YES
-  17   2500   1000   1000  ondemand      no     YES     YES     YES
-  18   2500   1000   1000  ondemand      no     YES     YES     YES
-  19   2500   1000   1000  ondemand      no     YES     YES     YES
-  20   2500   1000   1000  ondemand      no     YES     YES     YES
-  21   2500   1000   1000  ondemand      no     YES     YES     YES
-  22   2500   1000   1000  ondemand      no     YES     YES     YES
+==== ================================ =============================== ========================
+                         P-STATE INFO              C-STATES DISABLED?              UNCORE INFO
+Core    Max    Min    Now    Governor    POLL      C1     C1E      C6     Max      Min     Now
+==== ====== ====== ====== =========== ======= ======= ======= ======= ======= ======== =======
+   0   3600    800    800   powersave      no      no      no      no    2500      800     800
+   1   3600    800   1900   powersave      no      no      no      no    2500      800     800
+   2   3600    800    799   powersave      no      no      no      no    2500      800     800
+   3   3600    800   1900   powersave      no      no      no      no    2500      800     800
+   4   3600    800   1900   powersave      no      no      no      no    2500      800     800
+   5   3600    800   1900   powersave      no      no      no      no    2500      800     800
+   6   3600    800   1900   powersave      no      no      no      no    2500      800     800
+   7   3600    800    800   powersave      no      no      no      no    2500      800     800
+   8   3600    800   1900   powersave      no      no      no      no    2500      800     800
+   9   3600    800   1900   powersave      no      no      no      no    2500      800     800
+  10   3600    800    800   powersave      no      no      no      no    2500      800     800
+  11   3600    800   1900   powersave      no      no      no      no    2500      800     800
+  12   3600    800   1900   powersave      no      no      no      no    2500      800     800
+  13   3600    800   1900   powersave      no      no      no      no    2500      800     800
+  14   3600    800   1900   powersave      no      no      no      no    2500      800     800
+  15   3600    800   1900   powersave      no      no      no      no    2500      800     800
+  16   3600    800    800   powersave      no      no      no      no    2500      800     800
+  17   3600    800   1900   powersave      no      no      no      no    2500      800     800
+  18   3600    800   1900   powersave      no      no      no      no    2500      800     800
+  19   3600    800   1900   powersave      no      no      no      no    2500      800     800
+  20   3600    800   1900   powersave      no      no      no      no    2500      800     800
+  21   3600    800   1900   powersave      no      no      no      no    2500      800     800
+  22   3600    800   1900   powersave      no      no      no      no    2500      800     800
 ```
 
 The remaining options allow settings of P-States (core frequency) and
@@ -169,24 +185,20 @@ the user selecting an option from a list of available values, followed by the
 user entering a range of cores  to which to apply the setting.
 
 ```bash
-Option: 3
- [1] conservative
- [2] ondemand
- [3] userspace
- [4] powersave
- [5] performance
- [6] schedutil
-Select Governor: 3
+Option: 4
+ [1] performance
+ [2] powersave
+Select Governor: 1
 Input Range of Cores: 5-10,14,20
 Working with cores: [5, 6, 7, 8, 9, 10, 14, 20]
-Writing 'userspace' to /sys/devices/system/cpu/cpu5/cpufreq/scaling_governor
-Writing 'userspace' to /sys/devices/system/cpu/cpu6/cpufreq/scaling_governor
-Writing 'userspace' to /sys/devices/system/cpu/cpu7/cpufreq/scaling_governor
-Writing 'userspace' to /sys/devices/system/cpu/cpu8/cpufreq/scaling_governor
-Writing 'userspace' to /sys/devices/system/cpu/cpu9/cpufreq/scaling_governor
-Writing 'userspace' to /sys/devices/system/cpu/cpu10/cpufreq/scaling_governor
-Writing 'userspace' to /sys/devices/system/cpu/cpu14/cpufreq/scaling_governor
-Writing 'userspace' to /sys/devices/system/cpu/cpu20/cpufreq/scaling_governor
+Writing 'performance' to /sys/devices/system/cpu/cpu5/cpufreq/scaling_governor
+Writing 'performance' to /sys/devices/system/cpu/cpu6/cpufreq/scaling_governor
+Writing 'performance' to /sys/devices/system/cpu/cpu7/cpufreq/scaling_governor
+Writing 'performance' to /sys/devices/system/cpu/cpu8/cpufreq/scaling_governor
+Writing 'performance' to /sys/devices/system/cpu/cpu9/cpufreq/scaling_governor
+Writing 'performance' to /sys/devices/system/cpu/cpu10/cpufreq/scaling_governor
+Writing 'performance' to /sys/devices/system/cpu/cpu14/cpufreq/scaling_governor
+Writing 'performance' to /sys/devices/system/cpu/cpu20/cpufreq/scaling_governor
 
 Press enter to continue ...
 ```
@@ -203,26 +215,38 @@ is the POLL C-state. Any other C-State is a sleep state, and may be
 enabled/disabled.
 
 ```bash
-Option: 7
- [1] C1-SKX
- [2] C1E-SKX
- [3] C6-SKX
- [a] All
-Select C-State: a
-Input Range of Cores: 0,2
-Working with cores: [0, 2]
-Writing '0' to /sys/devices/system/cpu/cpu0/cpuidle/state1/disable
+Option: 8
+ [1] C6
+ [2] C1
+ [3] C1E
+ [4] POLL
+Select C-State: 3
+Input Range of Cores: 0-4
+Working with cores: [0, 1, 2, 3, 4]
 Writing '0' to /sys/devices/system/cpu/cpu0/cpuidle/state2/disable
-Writing '0' to /sys/devices/system/cpu/cpu0/cpuidle/state3/disable
-Writing '0' to /sys/devices/system/cpu/cpu2/cpuidle/state1/disable
+Writing '0' to /sys/devices/system/cpu/cpu1/cpuidle/state2/disable
 Writing '0' to /sys/devices/system/cpu/cpu2/cpuidle/state2/disable
-Writing '0' to /sys/devices/system/cpu/cpu2/cpuidle/state3/disable
+Writing '0' to /sys/devices/system/cpu/cpu3/cpuidle/state2/disable
+Writing '0' to /sys/devices/system/cpu/cpu4/cpuidle/state2/disable
 
 Press enter to continue ...
 ```
 
 Note that when changing C-State settings, there is an option to select all,
 allowing the convenient enable/disable of all non-POLL C-States in one step.
+
+# Working with Uncore Freqs
+
+The Uncore Freqs settings allow setting of the maximum and minimum range
+of Uncore Frequencies and also displays available Uncore Frequencies.
+
+```bash
+Option: 11
+ Available uncore freqs: [2500, 2400, 2300, 2200, 2100, 2000, 1900, 1800, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000, 900, 800]
+Input UncoreFreq: 2000
+
+Press enter to continue ...
+```
 
 Please see the help text provided by the script for examples of using the
 command line parameters.
