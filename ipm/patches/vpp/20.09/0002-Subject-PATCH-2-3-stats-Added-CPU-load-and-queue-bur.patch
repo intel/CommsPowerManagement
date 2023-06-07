@@ -1,0 +1,241 @@
+From db46276f403f9a7811042782d78979c978726e82 Mon Sep 17 00:00:00 2001
+From: Katelyn Donnellan <Katelyn.Donnellan@intel.com>
+Date: Fri, 24 Mar 2023 13:32:52 +0000
+Subject: [PATCH 2/3] Subject: [PATCH 2/3] stats: Added CPU load and queue
+ burst flag in stats
+
+This patch adds following capabilities:
+- flag to indicate when number of packets in DPDK queue cross
+configurable queue threshold.
+- Stats config parameter to configure interval for CPU load
+measurement.
+  `cpuload-interval <time in seconds>`
+- Queue threshold parameter in DPDK config section.
+  `queue-threshold <float value between 0 to 1>
+---
+ src/plugins/dpdk/device/dpdk.h |  1 +
+ src/plugins/dpdk/device/init.c |  3 +++
+ src/plugins/dpdk/device/node.c |  9 +++++++++
+ src/vlib/main.c                |  7 ++++++-
+ src/vlib/main.h                |  1 +
+ src/vpp/stats/stat_segment.c   | 25 +++++++++++++++++++++++++
+ src/vpp/stats/stat_segment.h   | 13 +++++++++++++
+ 7 files changed, 58 insertions(+), 1 deletion(-)
+
+diff --git a/src/plugins/dpdk/device/dpdk.h b/src/plugins/dpdk/device/dpdk.h
+index 40f9dce0c..173ac2e61 100644
+--- a/src/plugins/dpdk/device/dpdk.h
++++ b/src/plugins/dpdk/device/dpdk.h
+@@ -284,6 +284,7 @@ typedef struct
+   u32 coremask;
+   u32 nchannels;
+   u32 num_crypto_mbufs;
++  f64 queue_threshold;
+ 
+   /*
+    * format interface names ala xxxEthernet%d/%d/%d instead of
+diff --git a/src/plugins/dpdk/device/init.c b/src/plugins/dpdk/device/init.c
+index d07acd644..efd39ce4e 100644
+--- a/src/plugins/dpdk/device/init.c
++++ b/src/plugins/dpdk/device/init.c
+@@ -1208,6 +1208,9 @@ dpdk_config (vlib_main_t * vm, unformat_input_t * input)
+       else if (unformat (input, "no-multi-seg"))
+ 	conf->no_multi_seg = 1;
+ 
++      else if (unformat (input, "queue-threshold %f", &conf->queue_threshold))
++             ;
++
+       else if (unformat (input, "dev default %U", unformat_vlib_cli_sub_input,
+ 			 &sub_input))
+ 	{
+diff --git a/src/plugins/dpdk/device/node.c b/src/plugins/dpdk/device/node.c
+index 256c399ea..46c0e0635 100644
+--- a/src/plugins/dpdk/device/node.c
++++ b/src/plugins/dpdk/device/node.c
+@@ -459,6 +459,8 @@ VLIB_NODE_FN (dpdk_input_node) (vlib_main_t * vm, vlib_node_runtime_t * node,
+   vnet_device_input_runtime_t *rt = (void *) node->runtime_data;
+   vnet_device_and_queue_t *dq;
+   u32 thread_index = node->thread_index;
++  bool burst = false;
++  int rx_ring_length = 0;
+ 
+   /*
+    * Poll all devices on this cpu for input/interrupts.
+@@ -467,9 +469,16 @@ VLIB_NODE_FN (dpdk_input_node) (vlib_main_t * vm, vlib_node_runtime_t * node,
+   foreach_device_and_queue (dq, rt->devices_and_queues)
+     {
+       xd = vec_elt_at_index(dm->devices, dq->dev_instance);
++      /* find the queue occupancy */
++      rx_ring_length = rte_eth_rx_queue_count(xd->port_id, dq->queue_id);
++      if (rx_ring_length > (xd->nb_rx_desc * dm->conf->queue_threshold)) {
++	       /* set the burst flag for this lcore */
++	      burst = true;
++      }
+       n_rx_packets += dpdk_device_input (vm, dm, xd, node, thread_index,
+ 					 dq->queue_id);
+     }
++  vm->cpuload_burst = burst;
+   /* *INDENT-ON* */
+   return n_rx_packets;
+ }
+diff --git a/src/vlib/main.c b/src/vlib/main.c
+index 6af6e1ad8..f75300aa7 100644
+--- a/src/vlib/main.c
++++ b/src/vlib/main.c
+@@ -43,6 +43,7 @@
+ #include <vlib/threads.h>
+ #include <vppinfra/tw_timer_1t_3w_1024sl_ov.h>
+ 
++#include <vpp/stats/stat_segment.h>
+ #include <vlib/unix/unix.h>
+ 
+ /* Actually allocate a few extra slots of vector data to support
+@@ -1711,6 +1712,7 @@ vlib_main_or_worker_loop (vlib_main_t * vm, int is_main)
+   f64 now;
+   vlib_frame_queue_main_t *fqm;
+   u32 frame_queue_check_counter = 0;
++  f64 cpuload_interval;
+ 
+   /* Initialize pending node vector. */
+   if (is_main)
+@@ -1728,6 +1730,9 @@ vlib_main_or_worker_loop (vlib_main_t * vm, int is_main)
+   else
+     cpu_time_now = clib_cpu_time_now ();
+ 
++  cpuload_interval = vm->clib_time.clocks_per_second *
++         vlib_get_stat_segment_cpuload_rate();
++
+   /* Pre-allocate interupt runtime indices and lock. */
+   vec_alloc (nm->pending_local_interrupts, 32);
+   vec_alloc (nm->pending_remote_interrupts, 32);
+@@ -1950,7 +1955,7 @@ vlib_main_or_worker_loop (vlib_main_t * vm, int is_main)
+                   (cpu_time_now - vm->cpu_load_interval_start);
+             }
+           vm->cpu_load_interval_start = cpu_time_now;
+-          vm->cpu_load_interval_end = cpu_time_now + 1e9;
++          vm->cpu_load_interval_end = cpu_time_now + cpuload_interval;
+           vm->cpu_load_clocks = 0;
+         }
+ 
+diff --git a/src/vlib/main.h b/src/vlib/main.h
+index 985e0c3e3..eba5b0be9 100644
+--- a/src/vlib/main.h
++++ b/src/vlib/main.h
+@@ -137,6 +137,7 @@ typedef struct vlib_main_t
+   u64 cpu_load_interval_end;
+   u64 cpu_load_clocks;
+   u32 cpu_load_points;
++  u32 cpuload_burst;
+ 
+   /* Incremented once for each main loop. */
+   volatile u32 main_loop_count;
+diff --git a/src/vpp/stats/stat_segment.c b/src/vpp/stats/stat_segment.c
+index 788d2fddb..36f1d1a27 100644
+--- a/src/vpp/stats/stat_segment.c
++++ b/src/vpp/stats/stat_segment.c
+@@ -605,6 +605,10 @@ do_stat_segment_updates (stat_segment_main_t * sm)
+ 
+       stat_validate_counter_vector (&sm->directory_vector
+ 				    [STAT_COUNTER_VECTOR_RATE_PER_WORKER], 0);
++      stat_validate_counter_vector (&sm->directory_vector
++		      [STAT_COUNTER_CPU_UTIL_PER_WORKER], 0);
++      stat_validate_counter_vector (&sm->directory_vector
++		      [STAT_COUNTER_QUEUE_BURST_PER_WORKER], 0);
+       num_worker_threads_set = 1;
+       vlib_stat_segment_unlock ();
+       clib_mem_set_heap (oldheap);
+@@ -632,6 +636,15 @@ do_stat_segment_updates (stat_segment_main_t * sm)
+       stat_set_simple_counter (&sm->directory_vector
+ 			       [STAT_COUNTER_VECTOR_RATE_PER_WORKER], i, 0,
+ 			       this_vector_rate);
++      /* Set the per-worker rate */
++      stat_set_simple_counter (&sm->directory_vector
++                     [STAT_COUNTER_CPU_UTIL_PER_WORKER], i, 0,
++                     (this_vlib_main->cpu_load_points/100));
++      /* Set the per-worker queue burst */
++      stat_set_simple_counter (&sm->directory_vector
++                     [STAT_COUNTER_QUEUE_BURST_PER_WORKER], i, 0,
++                     (this_vlib_main->cpuload_burst));
++
+     }
+ 
+   /* And set the system average rate */
+@@ -746,6 +759,14 @@ vlib_get_stat_segment_update_rate (void)
+   return stat_segment_main.update_interval;
+ }
+ 
++/* Overrides weak reference in vlib:node_cli.c */
++f64
++vlib_get_stat_segment_cpuload_rate (void)
++{
++  return stat_segment_main.cpuload_interval;
++}
++
++
+ static uword
+ stat_segment_collector_process (vlib_main_t * vm, vlib_node_runtime_t * rt,
+ 				vlib_frame_t * f)
+@@ -894,6 +915,7 @@ statseg_config (vlib_main_t * vm, unformat_input_t * input)
+ {
+   stat_segment_main_t *sm = &stat_segment_main;
+   sm->update_interval = 10.0;
++  sm->cpuload_interval = 10.0;
+ 
+   while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+     {
+@@ -911,6 +933,9 @@ statseg_config (vlib_main_t * vm, unformat_input_t * input)
+ 	sm->node_counters_enabled = 0;
+       else if (unformat (input, "update-interval %f", &sm->update_interval))
+ 	;
++      else if (unformat (input, "cpuload-interval %f", &sm->cpuload_interval))
++       ;
++
+       else
+ 	return clib_error_return (0, "unknown input `%U'",
+ 				  format_unformat_error, input);
+diff --git a/src/vpp/stats/stat_segment.h b/src/vpp/stats/stat_segment.h
+index a88067154..a92b87cff 100644
+--- a/src/vpp/stats/stat_segment.h
++++ b/src/vpp/stats/stat_segment.h
+@@ -25,6 +25,8 @@ typedef enum
+  STAT_COUNTER_VECTOR_RATE = 0,
+  STAT_COUNTER_NUM_WORKER_THREADS,
+  STAT_COUNTER_VECTOR_RATE_PER_WORKER,
++ STAT_COUNTER_CPU_UTIL_PER_WORKER,
++ STAT_COUNTER_QUEUE_BURST_PER_WORKER,
+  STAT_COUNTER_INPUT_RATE,
+  STAT_COUNTER_LAST_UPDATE,
+  STAT_COUNTER_LAST_STATS_CLEAR,
+@@ -44,6 +46,10 @@ typedef enum
+   _(VECTOR_RATE, SCALAR_INDEX, vector_rate, /sys)               \
+   _(VECTOR_RATE_PER_WORKER, COUNTER_VECTOR_SIMPLE,              \
+     vector_rate_per_worker, /sys)                               \
++  _(CPU_UTIL_PER_WORKER, COUNTER_VECTOR_SIMPLE,                 \
++    cpu_util_per_worker, /sys)                                  \
++  _(QUEUE_BURST_PER_WORKER, COUNTER_VECTOR_SIMPLE,              \
++   queue_burst_per_worker, /sys)                                \
+   _(NUM_WORKER_THREADS, SCALAR_INDEX, num_worker_threads, /sys) \
+   _(INPUT_RATE, SCALAR_INDEX, input_rate, /sys)                 \
+   _(LAST_UPDATE, SCALAR_INDEX, last_update, /sys)               \
+@@ -89,6 +95,9 @@ typedef struct
+   /* Update interval */
+   f64 update_interval;
+ 
++  /* CPU load interval */
++  f64 cpuload_interval;
++
+   clib_spinlock_t *stat_segment_lockp;
+   clib_socket_t *socket;
+   u8 *socket_name;
+@@ -112,4 +121,8 @@ clib_error_t *
+ stat_segment_deregister_state_counter(u32 index);
+ void stat_segment_set_state_counter (u32 index, u64 value);
+ 
++f64
++vlib_get_stat_segment_cpuload_rate (void);
++
++
+ #endif
+-- 
+2.17.1
+

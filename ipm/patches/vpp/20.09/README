@@ -1,0 +1,27 @@
+Please ensure the following fix is present in the 20.09 version of the
+code to ensure telemetry is received correctly
+
+commit 007bd2f1fe3a29a8600462af74cf3b1b077fdf30
+Author: Ole Troan ot@cisco.com
+Date:   Wed Oct 21 11:55:28 2020 +0200
+
+    stats: missing dimension in stat_set_simple_counter
+
+    A simple counter is a two dimensional array by threads and
+    counter index. 28017 introduced an error missing the first
+    dimension.
+
+    If a vector is updated at the same time as a client reads,
+    an invalid pointer my result. This will be caught by the
+    optimistic locking after copying out the data, but if
+    following a pointer outside of the stat segment then
+    the stat client would crash. Add suitable boundary checks
+    for access to stat memory segment.
+
+    Fixes: 7d29e320fb2855a1ddb7a6af09078b8ed636de01
+    Type: fix
+    Signed-off-by: Ole Troan ot@cisco.com
+    Change-Id: I94f124ec71d98218c4eda5d124ac5594743d93d6
+    (cherry picked from commit 65c56c83ce4e58178b5ad90a8f325692c9904381)
+    Signed-off-by: Elias Rudberg elias.rudberg@bahnhof.net
+
