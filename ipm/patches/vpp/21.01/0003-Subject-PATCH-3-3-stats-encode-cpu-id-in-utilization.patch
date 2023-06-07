@@ -1,0 +1,33 @@
+From 8d0e7dbc2b2223278251f2989e21496073165f0d Mon Sep 17 00:00:00 2001
+From: Mairtin o Loingsigh <mairtin.oloingsigh@intel.com>
+Date: Wed, 15 Mar 2023 19:34:16 +0000
+Subject: [PATCH 3/3] Subject: [PATCH 3/3] stats: encode cpu id in utilization
+ metric
+
+This patch adds cpu-id field in utilization metric reported by vpp.
+Lower 8-bits is CPU utilization and rest of the bits is cpu-id.
+---
+ src/vpp/stats/stat_segment.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/vpp/stats/stat_segment.c b/src/vpp/stats/stat_segment.c
+index 53ea59828..ed806d208 100644
+--- a/src/vpp/stats/stat_segment.c
++++ b/src/vpp/stats/stat_segment.c
+@@ -643,11 +643,11 @@ do_stat_segment_updates (stat_segment_main_t * sm)
+       /* Set the per-worker rate */
+       stat_set_simple_counter (&sm->directory_vector
+ 		      [STAT_COUNTER_CPU_UTIL_PER_WORKER], i, 0,
+-		      (this_vlib_main->cpu_load_points/100));
++		      ((this_vlib_main->cpu_id << 8) | (this_vlib_main->cpu_load_points/100)));
+       /* Set the per-worker queue burst */
+       stat_set_simple_counter (&sm->directory_vector
+ 		      [STAT_COUNTER_QUEUE_BURST_PER_WORKER], i, 0,
+-		      (this_vlib_main->cpuload_burst));
++		      ((this_vlib_main->cpu_id << 8) | (this_vlib_main->cpuload_burst)));
+ 
+     }
+ 
+-- 
+2.25.1
+
