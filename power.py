@@ -67,6 +67,7 @@ def rdmsr(core, msr):
         msr_file = os.open(msr_filename, os.O_RDONLY)
         os.lseek(msr_file, msr, os.SEEK_SET)
         regstr = os.read(msr_file, 8)
+        os.close(msr_file)
         return regstr
     except (IOError, OSError) as err:
         raise IOError(f"{err}: Could not read MSR 0x{msr} on core {core}")
