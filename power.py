@@ -10,6 +10,7 @@ import getopt
 import re
 import struct
 import glob
+import time
 
 # raw_input() is only available in python 2.
 try:
@@ -48,6 +49,7 @@ freq_P1 = 0
 freq_P1n = 0
 PKG_TO_DIE_PATH = {}
 CORE_TO_PKG = {}
+list_interval = 0
 
 
 def getfileval(stateFileName):
@@ -279,8 +281,7 @@ def set_turbo(val):
         print(f"{err}: failed to enable or disable the turbo")
 
 
-def listinfo():
-    cpucount = getcpucount()
+def listinfo(cpurange):
     try:
         cstates = os.listdir("/sys/devices/system/cpu/cpu0/cpuidle")
     except OSError:
@@ -315,7 +316,7 @@ def listinfo():
     print(" ======= ========", end='')
     print("")
 
-    for x in range(0, cpucount):
+    for x in cpurange:
         try:
             cpu = getPkgId(x)
             pkg_die_path = f"package_*{cpu}_die_*/"
@@ -625,6 +626,7 @@ def show_help():
     print('   -h            Show this help')
     print('   -i            Show information on available freqs, C-States, etc')
     print('   -l            List information on each core')
+    print('   -L <sec>      List information on each core repeatedly at <sec> intervals')
     print('   -M <freq>     Set core maximum frequency. Can also use "max", "min", or "base"')
     print('   -m <freq>     Set core minimum frequency. Can also use "max", "min", or "base"')
     print('   -s <freq>     Set core frequency (within min and max)')
@@ -680,7 +682,7 @@ def input_cstate():
         return ""
 
 
-def do_menu():
+def do_menu(cpurange):
     print("----------------------------------------------------------")
     print("[1] Display Available Settings")
     print("[2] Display Current Settings")
@@ -711,7 +713,7 @@ def do_menu():
         getinfo()
     # ("[2] Display Current Settings")
     elif (text == "2"):
-        listinfo()
+        listinfo(cpurange)
     # ("[3] Display Available P-States")
     elif (text == "3"):
         show_pstates()
@@ -816,7 +818,7 @@ if (check_driver() == 0):
     sys.exit(1)
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "hilM:m:r:s:g:e:d:U:u:Tt", [
+    opts, args = getopt.getopt(sys.argv[1:], "hilM:m:r:s:g:e:d:U:u:TtL:", [
                                "maxfreq=", "minfreq=", "range="])
 except getopt.GetoptError:
     print('d.py -x <maxfreq>')
@@ -829,11 +831,16 @@ scriptname = sys.argv[0]
 
 if (len(opts) == 0):
     while(1):
-        do_menu()
+        do_menu(cpurange)
         print("")
         raw_input("Press enter to continue ... ")
         print("")
 
+
+for opt, arg in opts:
+    if opt in ("-r", "--range"):
+        cpurange = range_expand(arg)
+        print("Working with cores: " + str(cpurange))
 
 for opt, arg in opts:
     if opt == '-h':
@@ -843,11 +850,14 @@ for opt, arg in opts:
         getinfo()
         sys.exit()
     if opt == '-l':
-        listinfo()
+        listinfo(cpurange)
         sys.exit()
-    if opt in ("-r", "--range"):
-        cpurange = range_expand(arg)
-        print("Working with cores: " + str(cpurange))
+    if opt in ("-L"):
+        list_interval = int(arg)
+        print("Using list interval of " + str(list_interval) + " seconds.")
+        while(1):
+            listinfo(cpurange)
+            time.sleep(list_interval)
 
 for opt, arg in opts:
     if opt in ("-M", "--maxfreq"):
