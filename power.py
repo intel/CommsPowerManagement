@@ -31,11 +31,13 @@ UNCORE_INIT_MIN = "initial_min_freq_khz"
 UNCORE_INIT_MAX = "initial_max_freq_khz"
 UNCORE_MIN = "min_freq_khz"
 UNCORE_MAX = "max_freq_khz"
+UNCORE_CUR = "current_freq_khz"
 TURBO_PATH = "/sys/devices/system/cpu/intel_pstate/no_turbo"
 CPU_PATH = "/sys/devices/system/cpu/"
 TOPO_PKG = "topology/physical_package_id"
 PKG0_DIE0_PATH = "package_00_die_00"
 MSR_UNCORE_RATIO_LIMIT = 0x620
+MSR_UNCORE_PERF_STATUS = 0x621
 UNCORE_HW_MAX = 2400
 UNCORE_HW_MIN = 800
 pstateList = []
@@ -256,6 +258,19 @@ def get_min_max_uncore_freq_msr(core_id):
     except(IOError, OSError):
         return 0, 0
 
+def get_cur_uncore_freq_msr(core_id):
+    """ Get the current uncore frequency from MSR."""
+    try:
+        # read current uncore frequency
+        regstr = rdmsr(core_id, MSR_UNCORE_PERF_STATUS)
+        msr_bytes = struct.unpack('BBBBBBBB', regstr)
+        uncore_cur = msr_bytes[0]*100
+
+        return uncore_cur
+
+    except(IOError, OSError):
+        return 0
+
 
 def show_uncore_freqs():
     """ Show available uncore freqs from sysfs/MSR."""
@@ -288,18 +303,28 @@ def listinfo(cpurange):
     except OSError:
         cstates = ""
     print("")
-    print("==== ================================", end='')
-    print(" ", end='')
-    for x in cstates:
+    print("==== ================================", end=' ')
+
+    # pointer_pos used for formating C-STATE title
+    pointer_pos = 1
+    for x in range(len(cstates)):
         print("=======", end='')
-    print("==", end='')
-    print(" ================", end='')
+        pointer_pos += 7
+        if x != 0:
+            print("=", end='')
+            pointer_pos += 1
+    if cstates != "":
+        print(" ", end='')
+
+    print("========================", end='')
     print("")
 
     print("                         P-STATE INFO", end='')
     if cstates != "":
-        print("      C-STATES DISABLED?", end='')
-    print("      UNCORE INFO ", end='')
+        cstates_title = "C-STATES DISABLED?"
+        print(f'{cstates_title:>{pointer_pos}}', end='')
+
+    print(f'{"UNCORE INFO":>25}', end='')
     print("")
 
     print("Core    Max    Min    Now    Governor", end='')
@@ -308,13 +333,13 @@ def listinfo(cpurange):
         name = getfileval(
             "/sys/devices/system/cpu/cpu0/cpuidle/" + x + "/name")
         print(" % 7s" % (name,), end='')
-    print("     Max      Min", end='')
+    print("     Max      Min     Now", end='')
     print("")
 
     print("==== ====== ====== ====== ===========", end='')
     for x in cstates:
         print(" =======", end='')
-    print(" ======= ========", end='')
+    print(" ======= ======== =======", end='')
     print("")
 
     for x in cpurange:
@@ -328,11 +353,15 @@ def listinfo(cpurange):
                 raise IOError("no sysfs entry for uncore_freq control")
             min_path = os.path.join(pkg_n_die_p[0], UNCORE_MIN)
             max_path = os.path.join(pkg_n_die_p[0], UNCORE_MAX)
+            cur_path = os.path.join(pkg_n_die_p[0], UNCORE_CUR)
 
             uncore_min = int(getfileval(min_path)) // 1000
             uncore_max = int(getfileval(max_path)) // 1000
+            uncore_cur = int(getfileval(cur_path)) // 1000
         except (IOError, OSError):
             uncore_min, uncore_max = get_min_max_uncore_freq_msr(x)
+            uncore_cur = get_cur_uncore_freq_msr(x)
+
         max = getfileval("/sys/devices/system/cpu/cpu" +
                          str(x) + "/cpufreq/scaling_max_freq")
         min = getfileval("/sys/devices/system/cpu/cpu" +
@@ -352,7 +381,7 @@ def listinfo(cpurange):
                 print(" % 7s" % ("YES",), end='')
             else:
                 print(" % 7s" % ("no",), end='')
-        print(f" {uncore_max:>7} {uncore_min:>8}", end='')
+        print(f" {uncore_max:>7} {uncore_min:>8} {uncore_cur:>7}", end='')
         print("")
     print("")
 
