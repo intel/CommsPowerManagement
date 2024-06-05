@@ -1,3 +1,8 @@
+[![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/intel/CommsPowerManagement/badge)](https://securityscorecards.dev/viewer/?uri=github.com/intel/CommsPowerManagement)
+![CodeQL](https://github.com/intel/userspace-cni-network-plugin/actions/workflows/codeql.yml/badge.svg?branch=main)
+
+
 # Introduction
 
 Recent generations of the Intel® Xeon® family processors allow configurations
