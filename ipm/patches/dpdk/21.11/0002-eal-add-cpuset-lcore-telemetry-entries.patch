@@ -1,7 +1,7 @@
-From ab83a7cbdea4d38de86b7f3c1a5e64a2aff0c06e Mon Sep 17 00:00:00 2001
+From ac2b8db5f2dc2578b99a63b0abaea703c092ab42 Mon Sep 17 00:00:00 2001
 From: Anatoly Burakov <anatoly.burakov@intel.com>
 Date: Fri, 15 Jul 2022 13:12:45 +0000
-Subject: [PATCH 2/2] eal: add cpuset lcore telemetry entries
+Subject: [PATCH 2/3] eal: add cpuset lcore telemetry entries
 
 Expose per-lcore cpuset information to telemetry.
 
@@ -84,5 +84,5 @@ index 2e9033bf5a..f01ccd9a65 100644
  }
  
 -- 
-2.31.1
+2.25.1
 

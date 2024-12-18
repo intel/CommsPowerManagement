@@ -1,0 +1,357 @@
+From 2a8e1d477157e299f02fb9e64aa5d197d2caee16 Mon Sep 17 00:00:00 2001
+From: David Hunt <david.hunt@intel.com>
+Date: Fri, 20 Sep 2024 09:11:45 +0100
+Subject: [PATCH 3/3] add capacity endpoint to telemetry thread
+
+Busyness is calculated on how busy the current core is, ignoring the
+current frequency. So a core that's 50% busy at P1 (e.g. 2GHz), shows
+as 100% busy at 1GHz.
+
+This patch adds a new 'capacity' metric that shows a percentage based on
+the P1 (base) freqency of the core, so that if the core is 50% busy at
+P1, it should show 50% regardless of what the current frequency is.
+
+Signed-off-by: David Hunt <david.hunt@intel.com>
+---
+ lib/eal/common/eal_common_lcore_telemetry.c | 241 ++++++++++++++++++++
+ lib/eal/include/rte_lcore.h                 |  21 ++
+ lib/eal/version.map                         |   1 +
+ 3 files changed, 263 insertions(+)
+
+diff --git a/lib/eal/common/eal_common_lcore_telemetry.c b/lib/eal/common/eal_common_lcore_telemetry.c
+index f01ccd9a65..1c6d085a55 100644
+--- a/lib/eal/common/eal_common_lcore_telemetry.c
++++ b/lib/eal/common/eal_common_lcore_telemetry.c
+@@ -10,9 +10,18 @@
+ #include <rte_cycles.h>
+ #include <rte_errno.h>
+ #include <rte_lcore.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <fcntl.h>
+ 
+ #ifdef RTE_LCORE_BUSYNESS
+ #include <rte_telemetry.h>
++#define MSR_PLATFORM_INFO 0xCE
++#define POWER_SYSFS_CUR_PATH    "/sys/devices/system/cpu/cpu%u/cpufreq/scaling_cur_freq"
++#define POWER_SYSFS_BASE_FREQ_PATH    "/sys/devices/system/cpu/cpu%u/cpufreq/base_frequency"
++#define POWER_SYSFS_SCALING_DRIVER_PATH    "/sys/devices/system/cpu/cpu%u/cpufreq/scaling_driver"
++#define POWER_SYSFS_SCALING_MAX_FREQ_PATH    "/sys/devices/system/cpu/cpu%u/cpufreq/scaling_max_freq"
++#define POWER_SYSFS_MSR_PATH    "/dev/cpu/%u/msr"
+ #endif
+ 
+ int __rte_lcore_telemetry_enabled;
+@@ -47,6 +56,183 @@ static struct lcore_telemetry *telemetry_data;
+ #define SMOOTH_COEFF 5
+ #define STATE_CHANGE_OPT 32
+ 
++static int p1_freq[RTE_MAX_LCORE] = {0};
++
++static int
++try_read_base_frequency(unsigned int lcore_id)
++{
++	char path[PATH_MAX];
++	int fd;
++	snprintf(path, sizeof(path), POWER_SYSFS_BASE_FREQ_PATH, rte_lcore_to_cpu_id(lcore_id));
++
++	fd = open(path, O_RDONLY);
++	if (fd == -1) {
++		return -1;
++	}
++	char buffer[16];
++	ssize_t bytesRead = pread(fd, buffer, sizeof(buffer) - 1, 0);
++	if (bytesRead == -1) {
++		close(fd);
++		return -1;
++	}
++	buffer[bytesRead] = '\0'; // Null-terminate the buffer
++	close(fd);
++
++	p1_freq[lcore_id] = atoi(buffer);
++	return p1_freq[lcore_id];
++
++
++}
++
++static int
++try_read_scaling_max_freq(unsigned int lcore_id)
++{
++	char path[PATH_MAX];
++	int freq;
++	int fd;
++
++	/*
++	 * If the driver is acpi_cpufreq, we can read the scaling_max_freq file
++	 */
++
++	snprintf(path, sizeof(path), POWER_SYSFS_SCALING_DRIVER_PATH, rte_lcore_to_cpu_id(lcore_id));
++	fd = open(path, O_RDONLY);
++	if (fd == -1) {
++		return -1;
++	}
++	char buffer[16];
++	ssize_t bytesRead = pread(fd, buffer, sizeof(buffer) - 1, 0);
++	if (bytesRead == -1) {
++		close(fd);
++		return -1;
++	}
++	buffer[bytesRead] = '\0'; // Null-terminate the buffer
++
++	close(fd);
++
++	if (strncmp(buffer, "acpi-cpufreq", 12) == 0) {
++		/* we can use the scaling_max_freq to get the p1 */
++		snprintf(path, sizeof(path), POWER_SYSFS_SCALING_MAX_FREQ_PATH, rte_lcore_to_cpu_id(lcore_id));
++		fd = open(path, O_RDONLY);
++		if (fd == -1) {
++			return -1;
++		}
++		ssize_t bytesRead = pread(fd, buffer, sizeof(buffer) - 1, 0);
++		if (bytesRead == -1) {
++			close(fd);
++			return -1;
++		}
++		buffer[bytesRead] = '\0'; // Null-terminate the buffer
++		close(fd);
++		freq = atoi(buffer) / 1000; /* convert to KHz */
++
++		/*
++		 * If the freq value ends with '1', then, turbo is enabled.
++		 * Round it down to the nearest 100. Otherwuse use the value.
++		 */
++		return (freq & ~1) * 1000; /* convert to Hz */
++	}
++	return -1;
++}
++
++static int
++try_read_msr(unsigned int lcore_id)
++{
++	char path[PATH_MAX];
++	int fd;
++	int freq;
++	uint64_t data;
++
++	/*
++	 * If the msr driver is present, we can read p1 from MSR_PLATFORM_INFO register
++	 */
++	snprintf(path, sizeof(path), POWER_SYSFS_MSR_PATH, rte_lcore_to_cpu_id(lcore_id));
++	fd = open(path, O_RDONLY);
++	if (fd < 0) {
++		return -1;
++	}
++
++	if (pread(fd, &data, sizeof(data), MSR_PLATFORM_INFO) != sizeof(data)) {
++		close(fd);
++		return -1;
++	}
++
++	close(fd);
++
++	freq = ((data >> 8) & 0xff) * 100 * 1000;
++
++	return freq;
++}
++
++
++static
++int read_sysfs_p1_freq(unsigned int lcore_id) {
++	int freq;
++
++	/* We've previously got the p1 frequency. */
++	if (p1_freq[lcore_id] != 0)
++		return p1_freq[lcore_id];
++
++	/*
++	 * Check the base_frequency file, if it's there
++	 */
++	freq = try_read_base_frequency(lcore_id);
++	if (freq != -1) {
++		p1_freq[lcore_id] = freq;
++		return freq;
++	}
++
++	/*
++	 * Check the scaling_max_freq file for the acpi-freq driver
++	 */
++	freq = try_read_scaling_max_freq(lcore_id);
++	if (freq != -1) {
++		p1_freq[lcore_id] = freq;
++		return freq;
++	}
++
++	/*
++	 * Try reading from the MSR register
++	 */
++	freq = try_read_msr(lcore_id);
++	if (freq != -1) {
++		p1_freq[lcore_id] = freq;
++		return freq;
++	}
++
++	RTE_LOG(ERR, EAL, "Capacity telemetry for lcore %d not supported: no p1 frequency found",
++			lcore_id);
++
++	return -1;
++}
++
++
++int current_fds[RTE_MAX_LCORE] = {0};
++
++static
++int read_sysfs_cur_freq(unsigned int lcore_id) {
++	char path[PATH_MAX];
++
++	if (current_fds[lcore_id] == 0) {
++		snprintf(path, sizeof(path), POWER_SYSFS_CUR_PATH, rte_lcore_to_cpu_id(lcore_id));
++		current_fds[lcore_id] = open(path, O_RDONLY);
++		if (current_fds[lcore_id] == -1) {
++			return -1;
++		}
++	}
++
++	char buffer[16];
++	ssize_t bytesRead = pread(current_fds[lcore_id], buffer, sizeof(buffer) - 1, 0);
++	if (bytesRead == -1) {
++		return -1;
++	}
++
++	buffer[bytesRead] = '\0'; // Null-terminate the buffer
++
++	int value = atoi(buffer);
++	return value;
++}
++
+ /* Helper function to check if the lcore is enabled.
+  * Cannot use rte_lcore_is_enabled since it only catches ROLE_RTE threads which
+  * does not include ROLE_NON_EAL threads which some application threads, for
+@@ -102,6 +288,33 @@ int rte_lcore_busyness(unsigned int lcore_id)
+ 	return telemetry_data[lcore_id].busyness;
+ }
+ 
++int rte_lcore_capacity(unsigned int lcore_id)
++{
++	const uint64_t active_thresh = RTE_LCORE_BUSYNESS_PERIOD * 1000;
++	struct lcore_telemetry *tdata;
++
++	if (lcore_id >= RTE_MAX_LCORE)
++		return -EINVAL;
++	tdata = &telemetry_data[lcore_id];
++
++	/* if the lcore is not active */
++	if (tdata->interval_ts == 0)
++		return LCORE_BUSYNESS_NOT_SET;
++	/* if the core hasn't been active in a while */
++	else if ((rte_rdtsc() - tdata->interval_ts) > active_thresh)
++		return LCORE_BUSYNESS_NOT_SET;
++
++	int cur_freq = read_sysfs_cur_freq(rte_lcore_to_cpu_id(lcore_id));
++	int busy = telemetry_data[lcore_id].busyness;
++	int p1 = read_sysfs_p1_freq(lcore_id) ;
++
++	if ((busy == -1) || (p1 <= 0)) {
++		return -1;
++	} else {
++		return busy * cur_freq / p1;
++	}
++}
++
+ int rte_lcore_busyness_enabled(void)
+ {
+ 	return __rte_lcore_telemetry_enabled;
+@@ -263,6 +476,26 @@ lcore_handle_busyness(const char *cmd __rte_unused,
+ 	return 0;
+ }
+ 
++static int
++lcore_handle_capacity(const char *cmd __rte_unused,
++		      const char *params __rte_unused, struct rte_tel_data *d)
++{
++	char corenum[64];
++	int i;
++
++	rte_tel_data_start_dict(d);
++
++	/* Foreach lcore - can't use macro since it excludes ROLE_NON_EAL */
++	for (i = 0; i < RTE_MAX_LCORE; i++) {
++		if (!lcore_enabled(i))
++			continue;
++		snprintf(corenum, sizeof(corenum), "%d", i);
++		rte_tel_data_add_dict_int(d, corenum, rte_lcore_capacity(i));
++	}
++
++	return 0;
++}
++
+ static int
+ lcore_handle_cpuset(const char *cmd __rte_unused,
+ 		    const char *params __rte_unused,
+@@ -326,6 +559,9 @@ RTE_INIT(lcore_init_telemetry)
+ 	rte_telemetry_register_cmd("/eal/lcore/busyness", lcore_handle_busyness,
+ 				   "return percentage busyness of cores");
+ 
++	rte_telemetry_register_cmd("/eal/lcore/capacity_used", lcore_handle_capacity,
++				   "return percentage capacity of cores");
++
+ 	rte_telemetry_register_cmd("/eal/lcore/busyness_enable", lcore_busyness_enable,
+ 				   "enable lcore busyness measurement");
+ 
+@@ -340,6 +576,11 @@ RTE_INIT(lcore_init_telemetry)
+ 
+ #else
+ 
++int rte_lcore_capacity(unsigned int lcore_id __rte_unused)
++{
++	return -ENOTSUP;
++}
++
+ int rte_lcore_busyness(unsigned int lcore_id __rte_unused)
+ {
+ 	return -ENOTSUP;
+diff --git a/lib/eal/include/rte_lcore.h b/lib/eal/include/rte_lcore.h
+index 3c64774bcb..dffb7d1ab5 100644
+--- a/lib/eal/include/rte_lcore.h
++++ b/lib/eal/include/rte_lcore.h
+@@ -426,6 +426,27 @@ __rte_experimental
+ int
+ rte_lcore_busyness(unsigned int lcore_id);
+ 
++/**
++ * @warning
++ * @b EXPERIMENTAL: this API may change without prior notice.
++ *
++ * Read capacity value corresponding to an lcore.
++ * This differs from busyness in that it is related to the current usage
++ * of the lcore compared to P1 frequency, not the current frequency.
++ *
++ * @param lcore_id
++ *   Lcore to read capacity value for.
++ * @return
++ *   - value between 0 and 100 on success
++ *   - -1 if lcore is not active
++ *   - -EINVAL if lcore is invalid
++ *   - -ENOMEM if not enough memory available
++ *   - -ENOTSUP if not supported
++ */
++__rte_experimental
++int
++rte_lcore_capacity(unsigned int lcore_id);
++
+ /**
+  * @warning
+  * @b EXPERIMENTAL: this API may change without prior notice.
+diff --git a/lib/eal/version.map b/lib/eal/version.map
+index a4451d58eb..a2a3ba045f 100644
+--- a/lib/eal/version.map
++++ b/lib/eal/version.map
+@@ -440,6 +440,7 @@ EXPERIMENTAL {
+ 	# added in 20.11
+ 	__rte_lcore_telemetry_timestamp;
+ 	__rte_lcore_telemetry_enabled;
++	rte_lcore_capacity;
+ 	rte_lcore_busyness;
+ 	rte_lcore_busyness_enabled;
+ 	rte_lcore_busyness_enabled_set;
+-- 
+2.25.1
+
