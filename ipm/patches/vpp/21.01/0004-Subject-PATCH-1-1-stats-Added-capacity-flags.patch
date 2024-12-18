@@ -1,0 +1,325 @@
+From 578a1dffb5b57781fa0c6e78736c38b1c87a046f Mon Sep 17 00:00:00 2001
+From: Hoang Nguyen <hoang1x.nguyen@intel.com>
+Date: Tue, 1 Oct 2024 17:10:32 +0000
+Subject: [PATCH 1/1] stats: Added capacity flag in stats
+
+Busyness is calculated on how busy the current core is, ignoring the
+current frequency. So a core that's 50% busy at P1 (e.g. 2GHz), shows
+as 100% busy at 1GHz.
+
+This patch adds a new 'capacity' metric that shows a percentage based on
+the P1 (base) freqency of the core, so that if the core is 50% busy at
+P1, it should show 50% regardless of what the current frequency is.
+
+---
+ src/vlib/cli.c               |  31 ++++++
+ src/vlib/main.h              |   1 +
+ src/vpp/stats/stat_segment.c | 199 ++++++++++++++++++++++++++++++++++-
+ src/vpp/stats/stat_segment.h |   3 +
+ 4 files changed, 233 insertions(+), 1 deletion(-)
+
+diff --git a/src/vlib/cli.c b/src/vlib/cli.c
+index ed78b045f..ce2047f25 100644
+--- a/src/vlib/cli.c
++++ b/src/vlib/cli.c
+@@ -949,6 +949,37 @@ VLIB_CLI_COMMAND (show_cpu_load_command, static) = {
+ };
+ /* *INDENT-ON* */
+ 
++static clib_error_t *
++show_cpu_capacity (vlib_main_t * vm, unformat_input_t * input,
++               vlib_cli_command_t * cmd)
++{
++ uword i;
++
++  vlib_cli_output (vm, "%10s | %10s | %12s", "Thread", "Core", "Load %");
++
++  for (i = 0; i < vlib_get_n_threads (); i++)
++    {
++      vlib_main_t *vm_i;
++
++      vm_i = vlib_get_main_by_index (i);
++      if (!vm_i)
++        continue;
++
++      vlib_cli_output (vm, "%8u   | %8u   |   %8.2f", i, vm_i->cpu_id,
++              (f64)vm_i->cpu_capacity / 100.0);
++    }
++
++  return 0;
++}
++
++/* *INDENT-OFF* */
++VLIB_CLI_COMMAND (show_cpu_capacity_command, static) = {
++  .path = "show cpu capacity",
++  .short_help = "Show cpu capacity",
++  .function = show_cpu_capacity,
++  .is_mp_safe = 1,
++};
++/* *INDENT-ON* */
+ 
+ static clib_error_t *
+ show_cpu (vlib_main_t * vm, unformat_input_t * input,
+diff --git a/src/vlib/main.h b/src/vlib/main.h
+index c997381bc..8e07b4a86 100644
+--- a/src/vlib/main.h
++++ b/src/vlib/main.h
+@@ -137,6 +137,7 @@ typedef struct vlib_main_t
+   u64 cpu_load_clocks;
+   u32 cpu_load_points;
+   u32 cpuload_burst;
++  u64 cpu_capacity;
+ 
+   /* Incremented once for each main loop. */
+   volatile u32 main_loop_count;
+diff --git a/src/vpp/stats/stat_segment.c b/src/vpp/stats/stat_segment.c
+index ed806d208..4ee7a8c20 100644
+--- a/src/vpp/stats/stat_segment.c
++++ b/src/vpp/stats/stat_segment.c
+@@ -22,9 +22,192 @@
+ #undef HAVE_MEMFD_CREATE
+ #include <vppinfra/linux/syscall.h>
+ #include <vpp-api/client/stat_client.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <fcntl.h>
++#include <unistd.h>
++
++#define MSR_PLATFORM_INFO 0xCE
++#define POWER_SYSFS_CUR_PATH    "/sys/devices/system/cpu/cpu%u/cpufreq/scaling_cur_freq"
++#define POWER_SYSFS_BASE_FREQ_PATH    "/sys/devices/system/cpu/cpu%u/cpufreq/base_frequency"
++#define POWER_SYSFS_SCALING_DRIVER_PATH    "/sys/devices/system/cpu/cpu%u/cpufreq/scaling_driver"
++#define POWER_SYSFS_SCALING_MAX_FREQ_PATH    "/sys/devices/system/cpu/cpu%u/cpufreq/scaling_max_freq"
++#define POWER_SYSFS_MSR_PATH    "/dev/cpu/%u/msr"
++
++#define MAX_LCORE 1280
++#define PATH_MAX  4096
++int current_fds[MAX_LCORE] = {0};
++static int p1_freq[MAX_LCORE] = {0};
+ 
+ stat_segment_main_t stat_segment_main;
+ 
++static int
++try_read_base_frequency(unsigned int lcore_id)
++{
++	char path[PATH_MAX];
++	int fd;
++	snprintf(path, sizeof(path), POWER_SYSFS_BASE_FREQ_PATH, lcore_id);
++
++	fd = open(path, O_RDONLY);
++	if (fd == -1) {
++		return -1;
++	}
++	char buffer[16];
++	ssize_t bytesRead = pread(fd, buffer, sizeof(buffer) - 1, 0);
++	if (bytesRead == -1) {
++		return -1;
++	}
++	buffer[bytesRead] = '\0'; // Null-terminate the buffer
++	close(fd);
++
++	p1_freq[lcore_id] = atoi(buffer);
++	return p1_freq[lcore_id];
++
++
++}
++
++static int
++try_read_scaling_max_freq(unsigned int lcore_id)
++{
++	char path[PATH_MAX];
++	int freq;
++	int fd;
++
++	/*
++	 * If the driver is acpi_cpufreq, we can read the scaling_max_freq file
++	 */
++	snprintf(path, sizeof(path), POWER_SYSFS_SCALING_DRIVER_PATH, lcore_id);
++	fd = open(path, O_RDONLY);
++	if (fd == -1) {
++		return -1;
++	}
++	char buffer[16];
++	ssize_t bytesRead = pread(fd, buffer, sizeof(buffer) - 1, 0);
++	if (bytesRead == -1) {
++		return -1;
++	}
++	buffer[bytesRead] = '\0'; // Null-terminate the buffer
++
++	close(fd);
++
++	if (strncmp(buffer, "acpi-cpufreq", 12) == 0) {
++		/* we can use the scaling_max_freq to get the p1 */
++		snprintf(path, sizeof(path), POWER_SYSFS_SCALING_MAX_FREQ_PATH, lcore_id);
++		fd = open(path, O_RDONLY);
++		if (fd == -1) {
++			return -1;
++		}
++		ssize_t bytesRead = pread(fd, buffer, sizeof(buffer) - 1, 0);
++		if (bytesRead == -1) {
++			return -1;
++		}
++		buffer[bytesRead] = '\0'; // Null-terminate the buffer
++		close(fd);
++		freq = atoi(buffer) / 1000; /* convert to KHz */
++
++		/*
++		 * If the freq value ends with '1', then, turbo is enabled.
++		 * Round it down to the nearest 100. Otherwuse use the value.
++		 */
++		return (freq & ~1) * 1000; /* convert to Hz */
++	}
++	return -1;
++}
++
++static int
++try_read_msr(unsigned int lcore_id)
++{
++	char path[PATH_MAX];
++	int fd;
++	int freq;
++	uint64_t data;
++
++	/*
++	 * If the msr driver is present, we can read p1 from MSR_PLATFORM_INFO register
++	 */
++	snprintf(path, sizeof(path), POWER_SYSFS_MSR_PATH, lcore_id);
++	fd = open(path, O_RDONLY);
++	if (fd < 0) {
++		return -1;
++	}
++
++	if (pread(fd, &data, sizeof(data), MSR_PLATFORM_INFO) != sizeof(data)) {
++		close(fd);
++		return -1;
++	}
++
++	close(fd);
++
++	freq = ((data >> 8) & 0xff) * 100 * 1000;
++
++	return freq;
++}
++
++
++static
++int read_sysfs_p1_freq(unsigned int lcore_id) {
++	int freq;
++
++	/* We've previously got the p1 frequency. */
++	if (p1_freq[lcore_id] != 0)
++		return p1_freq[lcore_id];
++
++	/*
++	 * Check the base_frequency file, if it's there
++	 */
++	freq = try_read_base_frequency(lcore_id);
++	if (freq != -1) {
++		p1_freq[lcore_id] = freq;
++		return freq;
++	}
++
++	/*
++	 * Check the scaling_max_freq file for the acpi-freq driver
++	 */
++	freq = try_read_scaling_max_freq(lcore_id);
++	if (freq != -1) {
++		p1_freq[lcore_id] = freq;
++		return freq;
++	}
++
++	/*
++	 * Try reading from the MSR register
++	 */
++	freq = try_read_msr(lcore_id);
++	if (freq != -1) {
++		p1_freq[lcore_id] = freq;
++		return freq;
++	}
++
++	return -1;
++}
++
++static
++int read_sysfs_cur_freq(unsigned int lcore_id) {
++	char path[PATH_MAX];
++
++	if (current_fds[lcore_id] == 0) {
++		sprintf(path, POWER_SYSFS_CUR_PATH, lcore_id);
++		current_fds[lcore_id] = open(path, O_RDONLY);
++		if (current_fds[lcore_id] == -1) {
++			perror("Failed to open file");
++			return -1;
++		}
++	}
++
++    char buffer[16];
++    ssize_t bytesRead = pread(current_fds[lcore_id], buffer, sizeof(buffer) - 1, 0);
++    if (bytesRead == -1) {
++        perror("Failed to read file");
++        return -1;
++    }
++
++    buffer[bytesRead] = '\0'; // Null-terminate the buffer
++
++    int value = atoi(buffer);
++    return value;
++}
++
+ /*
+  *  Used only by VPP writers
+  */
+@@ -613,6 +796,8 @@ do_stat_segment_updates (stat_segment_main_t * sm)
+                                     [STAT_COUNTER_CPU_UTIL_PER_WORKER], 0);
+       stat_validate_counter_vector (&sm->directory_vector
+                                     [STAT_COUNTER_QUEUE_BURST_PER_WORKER], 0);
++      stat_validate_counter_vector (&sm->directory_vector
++		      [STAT_COUNTER_CPU_CAPACITY], 0);                                
+       num_worker_threads_set = 1;
+       vlib_stat_segment_unlock ();
+       clib_mem_set_heap (oldheap);
+@@ -648,7 +833,19 @@ do_stat_segment_updates (stat_segment_main_t * sm)
+       stat_set_simple_counter (&sm->directory_vector
+ 		      [STAT_COUNTER_QUEUE_BURST_PER_WORKER], i, 0,
+ 		      ((this_vlib_main->cpu_id << 8) | (this_vlib_main->cpuload_burst)));
+-
++      /* Calculate capacity */
++      int core_id = this_vlib_main->cpu_id;
++      int cur_freq = read_sysfs_cur_freq(core_id);
++      int p1 = read_sysfs_p1_freq(core_id) ;
++      if (p1 <= 0) {
++        this_vlib_main->cpu_capacity = 0;
++      } else {
++        this_vlib_main->cpu_capacity = (u64)this_vlib_main->cpu_load_points * cur_freq/p1;
++      }
++      /* Set the per-worker capacity */
++      stat_set_simple_counter (&sm->directory_vector
++                     [STAT_COUNTER_CPU_CAPACITY], i, 0,
++                     ((this_vlib_main->cpu_id << 8) | (this_vlib_main->cpu_capacity/100)));
+     }
+ 
+   /* And set the system average rate */
+diff --git a/src/vpp/stats/stat_segment.h b/src/vpp/stats/stat_segment.h
+index fdf9986fb..c059f3c0a 100644
+--- a/src/vpp/stats/stat_segment.h
++++ b/src/vpp/stats/stat_segment.h
+@@ -27,6 +27,7 @@ typedef enum
+  STAT_COUNTER_VECTOR_RATE_PER_WORKER,
+  STAT_COUNTER_CPU_UTIL_PER_WORKER,
+  STAT_COUNTER_QUEUE_BURST_PER_WORKER,
++ STAT_COUNTER_CPU_CAPACITY,
+  STAT_COUNTER_INPUT_RATE,
+  STAT_COUNTER_LAST_UPDATE,
+  STAT_COUNTER_LAST_STATS_CLEAR,
+@@ -50,6 +51,8 @@ typedef enum
+     cpu_util_per_worker, /sys)                                  \
+   _(QUEUE_BURST_PER_WORKER, COUNTER_VECTOR_SIMPLE,              \
+    queue_burst_per_worker, /sys)                                \
++  _(CPU_CAPACITY, COUNTER_VECTOR_SIMPLE,                        \
++   capacity_per_worker, /sys)                                   \
+   _(NUM_WORKER_THREADS, SCALAR_INDEX, num_worker_threads, /sys) \
+   _(INPUT_RATE, SCALAR_INDEX, input_rate, /sys)                 \
+   _(LAST_UPDATE, SCALAR_INDEX, last_update, /sys)               \
+-- 
+2.25.1
+

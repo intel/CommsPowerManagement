@@ -1,0 +1,40 @@
+From da344f40a6bb7323bea49af7f009433b4ce65660 Mon Sep 17 00:00:00 2001
+From: Hoang Nguyen <hoang1x.nguyen@intel.com>
+Date: Fri, 16 Aug 2024 13:44:22 +0000
+Subject: [PATCH 3/3] stats: encode cpu id in utilization metric
+
+This patch adds cpu-id field in utilization metric reported by vpp.
+Lower 8-bits is CPU utilization and rest of the bits is cpu-id.
+
+Type: improvement
+---
+ src/vlib/stats/provider_mem.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/vlib/stats/provider_mem.c b/src/vlib/stats/provider_mem.c
+index f8e77a9fc..6840ec0d1 100644
+--- a/src/vlib/stats/provider_mem.c
++++ b/src/vlib/stats/provider_mem.c
+@@ -95,7 +95,8 @@ stat_provider_cpu_util_per_thread_update_fn (
+       this_vlib_main = vlib_get_main_by_index (i);
+       /* Set the per-worker cpu util */
+       cb = counters[i];
+-      cb[0] = this_vlib_main->cpu_load_points/100;
++      /* Lower 8-bits is CPU utilization and rest is core id */
++      cb[0] = ((this_vlib_main->cpu_id << 8) | (this_vlib_main->cpu_load_points/100));
+     }
+ }
+ 
+@@ -114,7 +115,8 @@ stat_provider_queue_burst_per_thread_update_fn (
+       this_vlib_main = vlib_get_main_by_index (i);
+       /* Set the per-worker queue burst */
+       cb = counters[i];
+-      cb[0] = this_vlib_main->cpuload_burst;
++      /* Lower 8-bits is burst flag and rest is core id */
++      cb[0] = ((this_vlib_main->cpu_id << 8) | (this_vlib_main->cpuload_burst));
+     }
+ }
+ 
+-- 
+2.25.1
+

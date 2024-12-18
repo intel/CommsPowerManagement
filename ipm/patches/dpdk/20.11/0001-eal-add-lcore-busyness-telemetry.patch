@@ -1,7 +1,7 @@
-From 6942cd799c2fe3ec8e96d8c7758159456b37f9f4 Mon Sep 17 00:00:00 2001
+From ef227c95dd0ac20017c7190c42b6c6a98dae2ae0 Mon Sep 17 00:00:00 2001
 From: Anatoly Burakov <anatoly.burakov@intel.com>
 Date: Fri, 15 Jul 2022 13:12:53 +0000
-Subject: [PATCH 1/2] eal: add lcore busyness telemetry
+Subject: [PATCH 1/3] eal: add lcore busyness telemetry
 
 Currently, there is no way to measure lcore busyness in a passive way,
 without any modifications to the application. This patch adds a new EAL
@@ -205,7 +205,7 @@ index c210cf86bd..16806a896a 100644
  }
  
 diff --git a/lib/librte_distributor/rte_distributor_single.c b/lib/librte_distributor/rte_distributor_single.c
-index e8a13ce980..06e4bab89f 100644
+index f4725b1d0b..80460ab5d3 100644
 --- a/lib/librte_distributor/rte_distributor_single.c
 +++ b/lib/librte_distributor/rte_distributor_single.c
 @@ -34,8 +34,11 @@ rte_distributor_request_pkt_single(struct rte_distributor_single *d,
@@ -677,10 +677,10 @@ index a55fd7496d..90c2aa037a 100644
  }
  #endif
 diff --git a/lib/librte_eal/linux/eal.c b/lib/librte_eal/linux/eal.c
-index 5814f9ce69..772cc98143 100644
+index 814572ccbd..ce5701e42d 100644
 --- a/lib/librte_eal/linux/eal.c
 +++ b/lib/librte_eal/linux/eal.c
-@@ -1368,6 +1368,7 @@ rte_eal_cleanup(void)
+@@ -1364,6 +1364,7 @@ rte_eal_cleanup(void)
  	rte_mp_channel_cleanup();
  	rte_trace_save();
  	eal_trace_fini();
@@ -721,10 +721,10 @@ index fe065a41d9..d828a0d791 100644
  
  INTERNAL {
 diff --git a/lib/librte_ethdev/rte_ethdev.h b/lib/librte_ethdev/rte_ethdev.h
-index 5e8331da1c..e800ad05bf 100644
+index 8856648d11..87d30a059a 100644
 --- a/lib/librte_ethdev/rte_ethdev.h
 +++ b/lib/librte_ethdev/rte_ethdev.h
-@@ -4890,6 +4890,8 @@ rte_eth_rx_burst(uint16_t port_id, uint16_t queue_id,
+@@ -4879,6 +4879,8 @@ rte_eth_rx_burst(uint16_t port_id, uint16_t queue_id,
  #endif
  
  	rte_ethdev_trace_rx_burst(port_id, queue_id, (void **)rx_pkts, nb_rx);
@@ -734,7 +734,7 @@ index 5e8331da1c..e800ad05bf 100644
  }
  
 diff --git a/lib/librte_eventdev/rte_eventdev.h b/lib/librte_eventdev/rte_eventdev.h
-index bec8f3c0c9..6cfe2925c8 100644
+index ce1fc2ce0f..820b3ba73d 100644
 --- a/lib/librte_eventdev/rte_eventdev.h
 +++ b/lib/librte_eventdev/rte_eventdev.h
 @@ -1663,13 +1663,19 @@ rte_event_dequeue_burst(uint8_t dev_id, uint8_t port_id, struct rte_event ev[],
@@ -786,7 +786,7 @@ index f29164dd15..c37712a3f0 100644
  
  int
 diff --git a/lib/librte_regexdev/rte_regexdev.h b/lib/librte_regexdev/rte_regexdev.h
-index df2312678c..00f0899fa8 100644
+index 0001658925..b3ec648ca9 100644
 --- a/lib/librte_regexdev/rte_regexdev.h
 +++ b/lib/librte_regexdev/rte_regexdev.h
 @@ -1524,6 +1524,7 @@ rte_regexdev_dequeue_burst(uint8_t dev_id, uint16_t qp_id,
@@ -809,7 +809,7 @@ index df2312678c..00f0899fa8 100644
  
  #ifdef __cplusplus
 diff --git a/lib/librte_ring/rte_ring_elem.h b/lib/librte_ring/rte_ring_elem.h
-index 0057da3597..5b1969cba1 100644
+index 7034d29c07..341bdf8dec 100644
 --- a/lib/librte_ring/rte_ring_elem.h
 +++ b/lib/librte_ring/rte_ring_elem.h
 @@ -475,6 +475,8 @@ __rte_ring_do_dequeue_elem(struct rte_ring *r, void *obj_table,
@@ -822,5 +822,5 @@ index 0057da3597..5b1969cba1 100644
  }
  
 -- 
-2.31.1
+2.25.1
 
