@@ -1,3 +1,5 @@
+# File will be removed in 2025.
+
 # OS/BIOS Mailbox
 
 The OS/BIOS mailbox provides control and discovery support for various Power Management features including ISS, FACT, PBF, and CLOS.
