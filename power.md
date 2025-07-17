@@ -55,19 +55,20 @@ When executing the script with the '-h' command line parameter, the user is
 presented with help text:
 
 ```bash
-# power.py  -h
+# power.py -h
 
-/usr/local/sbin/power.py -i -M <maxfreq> -m <minfreq> -s <setfreq> -r <range> -g <governor>
+power.py -i -M <maxfreq> -m <minfreq> -s <setfreq> -r <range> -g <governor>
    <no params>   use interactive menu
    -h            Show this help
    -i            Show information on available freqs, C-States, etc
+   -f            Show UNCORE information
    -l            List information on each core
-   -L <sec>      List information on each core repeatedly at <sec> intervals
+   -L <sec>      List information repeatedly at <sec> intervals (need -l or -f, or both)
    -M <freq>     Set core maximum frequency. Can also use "max", "min", or "base"
    -m <freq>     Set core minimum frequency. Can also use "max", "min", or "base"
    -s <freq>     Set core frequency (within min and max)
    -r <range>    Range of cores to affect, e.g. 1-3,5,7
-   -g <governor> Set core governor (usually 'userspace')
+   -g <governor> Set core P-State governor (usually 'userspace')
    -e <cstate>   Enable core C-State
    -d <cstate>   Disable core C-State
    -U <freq>     Set uncore maximum frequency
@@ -79,16 +80,24 @@ Examples:
 
 1. Set governor to ondemand, min 1GHz, max 2.5GHz, cores 0-10
 
-   /usr/local/bin/power.py -g ondemand -r 0-10 -M 2500 -m 1000
+   power.py -g ondemand -r 0-10 -M 2500 -m 1000
 
 2. Set governor to userspace, cores 2 and 4 only, set freq to 2GHz
 
-   /usr/local/bin/power.py -g userspace -r 2,4 -s 2000
+   power.py -g userspace -r 2,4 -s 2000
 
 3. Set governor to userspace, core 1, set freq to Turbo Boost
    this assumes there's a 2501 and a 2500 freq available.
 
-   /usr/local/bin/power.py -g userspace -r 1 -M 2501 -s 2501
+   power.py -g userspace -r 1 -M 2501 -s 2501
+
+4. Display information on the uncore
+
+   power.py -f
+
+5. Display information about core and uncore every second
+
+   power.py -L 1 -lf
 ```
 
 When executing the script without any command line parameters, the user is
@@ -109,7 +118,7 @@ presented with the following menu:
 [8] Enable C-State for a range of cores
 [9] Disable C-State for a range of cores
 
-[10] Display Available Uncore Freqs
+[10] Display Uncore Information
 [11] Set Uncore Maximum for a range of cores
 [12] Set Uncore Minimum for a range of cores
 
@@ -145,37 +154,57 @@ _Note: The output produced varies based on system configuration, not all governo
 ```bash
 Option: 2
 
-==== ================================ =============================== ========================
-                         P-STATE INFO              C-STATES DISABLED?              UNCORE INFO
-Core    Max    Min    Now    Governor    POLL      C1     C1E      C6     Max      Min     Now
-==== ====== ====== ====== =========== ======= ======= ======= ======= ======= ======== =======
-   0   3600    800    800   powersave      no      no      no      no    2500      800     800
-   1   3600    800   1900   powersave      no      no      no      no    2500      800     800
-   2   3600    800    799   powersave      no      no      no      no    2500      800     800
-   3   3600    800   1900   powersave      no      no      no      no    2500      800     800
-   4   3600    800   1900   powersave      no      no      no      no    2500      800     800
-   5   3600    800   1900   powersave      no      no      no      no    2500      800     800
-   6   3600    800   1900   powersave      no      no      no      no    2500      800     800
-   7   3600    800    800   powersave      no      no      no      no    2500      800     800
-   8   3600    800   1900   powersave      no      no      no      no    2500      800     800
-   9   3600    800   1900   powersave      no      no      no      no    2500      800     800
-  10   3600    800    800   powersave      no      no      no      no    2500      800     800
-  11   3600    800   1900   powersave      no      no      no      no    2500      800     800
-  12   3600    800   1900   powersave      no      no      no      no    2500      800     800
-  13   3600    800   1900   powersave      no      no      no      no    2500      800     800
-  14   3600    800   1900   powersave      no      no      no      no    2500      800     800
-  15   3600    800   1900   powersave      no      no      no      no    2500      800     800
-  16   3600    800    800   powersave      no      no      no      no    2500      800     800
-  17   3600    800   1900   powersave      no      no      no      no    2500      800     800
-  18   3600    800   1900   powersave      no      no      no      no    2500      800     800
-  19   3600    800   1900   powersave      no      no      no      no    2500      800     800
-  20   3600    800   1900   powersave      no      no      no      no    2500      800     800
-  21   3600    800   1900   powersave      no      no      no      no    2500      800     800
-  22   3600    800   1900   powersave      no      no      no      no    2500      800     800
+==== ================================ ===============================
+                         P-STATE INFO              C-STATES DISABLED?
+Core    Max    Min    Now    Governor    POLL      C1     C1E      C6
+==== ====== ====== ====== =========== ======= ======= ======= =======
+   0   1900    800    800   powersave      no      no      no      no
+   1   1900    800    800   powersave      no      no      no      no
+   2   1900    800    800   powersave      no      no      no      no
+   3   1900    800    800   powersave      no      no      no      no
+   4   1900    800    800   powersave      no      no      no      no
+   5   1900    800    800   powersave      no      no      no      no
+   6   1900    800    800   powersave      no      no      no      no
+   7   1900    800    800   powersave      no      no      no      no
+   8   1900    800    800   powersave      no      no      no      no
+   9   1900    800    800   powersave      no      no      no      no
+  10   1900    800    800   powersave      no      no      no      no
+  11   1900    800    800   powersave      no      no      no      no
+  12    800    800    800 performance      no      no      no      no
+  13    800    800    800 performance      no      no      no      no
+  14    800    800    800 performance      no      no      no      no
+  15    800    800    800 performance      no      no      no      no
+  16    800    800    800 performance      no      no      no      no
+  17    800    800    800 performance      no      no      no      no
+  18    800    800    766 performance      no      no      no      no
+  19    800    800    800 performance      no      no      no      no
+  20    800    800    800 performance      no      no      no      no
+  21    800    800    800 performance      no      no      no      no
+  22    800    800    800 performance      no      no      no      no
+  23    800    800    800 performance      no      no      no      no
+  24    800    800    800 performance      no      no      no      no
+
+Press enter to continue ...
 ```
 
-The remaining options allow settings of P-States (core frequency) and
-C-States (core sleep states)
+[10] Display Uncore Information
+
+```bash
+Option: 10
+==================   ==========   ========   ==========================    ==============
+                                                  Uncore freq
+Uncore Identifier    package Id     Die ID        Min      Max  Current         Core list
+==================   ==========   ========   ==========================    ==============
+package_00_die_00             0          0       1800     1800     1800              0-23
+package_01_die_00             1          0       1800     1800     1800             24-47
+
+ Available uncore freqs: [2000, 1900, 1800, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000, 900, 800]
+
+Press enter to continue ...
+```
+
+The remaining options allow settings of P-States (core frequency),
+C-States (core sleep states) and uncore frequency.
 
 # Working with P-States
 
@@ -244,6 +273,8 @@ of Uncore Frequencies and also displays available Uncore Frequencies.
 Option: 11
  Available uncore freqs: [2500, 2400, 2300, 2200, 2100, 2000, 1900, 1800, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000, 900, 800]
 Input UncoreFreq: 2000
+Set maximum uncore frequency to 2000 for package_00_die_00
+Set maximum uncore frequency to 2000 for package_01_die_00
 
 Press enter to continue ...
 ```

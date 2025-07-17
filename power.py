@@ -35,11 +35,15 @@ UNCORE_CUR = "current_freq_khz"
 TURBO_PATH = "/sys/devices/system/cpu/intel_pstate/no_turbo"
 CPU_PATH = "/sys/devices/system/cpu/"
 TOPO_PKG = "topology/physical_package_id"
+TOPO_DIE_ID = "topology/die_id"
+TOPO_SIBLING_LIST = "topology/core_siblings_list"
+NODE_PATH="/sys/devices/system/node/"
 PKG0_DIE0_PATH = "package_00_die_00"
 MSR_UNCORE_RATIO_LIMIT = 0x620
 MSR_UNCORE_PERF_STATUS = 0x621
 UNCORE_HW_MAX = 2400
 UNCORE_HW_MIN = 800
+MHZ_CONVERSION_FACTOR = 1000
 pstateList = []
 freqs = []
 stateList = []
@@ -222,6 +226,24 @@ def show_governors():
     print(s)
 
 
+def is_multi_uncore_sku():
+    """Checks if the system has nultiple uncores"""
+    return os.path.isdir(os.path.join(UNCORE_PATH, "uncore00"))
+
+
+def show_available_uncore_clusters():
+    """Display uncores available in the system"""
+    if is_multi_uncore_sku():
+        cluster_list = []
+        for dirpath, dirnames, filenames in os.walk(UNCORE_PATH):
+            for dirname in dirnames:
+                if dirname.startswith("uncore"):
+                    cluster_list.append(dirname[6:])
+
+        cluster_list.sort()
+        print(f"\nAvailable uncore cluster: {cluster_list}\n")
+
+
 def getinfo():
     global driver
 
@@ -236,8 +258,7 @@ def getinfo():
 
     show_governors()
     show_cstates()
-
-
+    show_available_uncore_clusters()
 
 
 def writetofile(val, stateFileName):
@@ -258,6 +279,7 @@ def get_min_max_uncore_freq_msr(core_id):
     except(IOError, OSError):
         return 0, 0
 
+
 def get_cur_uncore_freq_msr(core_id):
     """ Get the current uncore frequency from MSR."""
     try:
@@ -272,6 +294,28 @@ def get_cur_uncore_freq_msr(core_id):
         return 0
 
 
+def show_uncore_from_MSRs():
+    """ Called if no uncore driver installed. Uses MSR values """
+
+    print("==================   ==========================    ==============")
+    print("Uncore                    Min      Max  Current         Core list")
+    print("==================   ==========================    ==============")
+    for entry in os.listdir(NODE_PATH):
+        if entry.startswith("node"):
+            for entry2 in os.listdir(NODE_PATH + entry):
+                match =  re.match(r'^cpu(\d+)', entry2)
+                if match:
+                    core = int(match.group(1))
+                    cpu_dir_path = os.path.join(CPU_PATH, "cpu" + str(core))
+                    core_list_path = os.path.join(cpu_dir_path, TOPO_SIBLING_LIST)
+                    core_list_data = getfileval(core_list_path)
+                    uncore_min, uncore_max = get_min_max_uncore_freq_msr(core)
+                    uncore_cur = get_cur_uncore_freq_msr(core)
+                    socket = entry.replace("node", "Socket ")
+                    print(f"{socket:<18}   {uncore_min:>8} {uncore_max:>8} {uncore_cur:>8}  {core_list_data:>16}")
+                    break
+
+
 def show_uncore_freqs():
     """ Show available uncore freqs from sysfs/MSR."""
     try:
@@ -279,8 +323,8 @@ def show_uncore_freqs():
                                      UNCORE_INIT_MIN)
         init_max_path = os.path.join(UNCORE_PATH, PKG0_DIE0_PATH,
                                      UNCORE_INIT_MAX)
-        min = int(getfileval(init_min_path)) // 1000
-        max = int(getfileval(init_max_path)) // 1000
+        min = int(getfileval(init_min_path)) // MHZ_CONVERSION_FACTOR
+        max = int(getfileval(init_max_path)) // MHZ_CONVERSION_FACTOR
     except (IOError, OSError, ValueError):
         min = UNCORE_HW_MIN
         max = UNCORE_HW_MAX
@@ -289,12 +333,106 @@ def show_uncore_freqs():
     print(" Available uncore freqs: " + str(uncore_freqs))
     return uncore_freqs
 
+
 def set_turbo(val):
     """This function enable or disable the turbo."""
     try:
         writetofile(str(val), TURBO_PATH)
     except (IOError, OSError, ValueError) as err:
         print(f"{err}: failed to enable or disable the turbo")
+
+
+def get_physical_id_mapping():
+    """This function returns dictionary with packageID and cpu associated with ID"""
+    physical_id_mapping = {}
+    for entry in os.listdir(CPU_PATH):
+        if entry.startswith('cpu'):
+            package_id_path = os.path.join(CPU_PATH, entry, TOPO_PKG)
+            if os.path.exists(package_id_path):
+                package_id = getfileval(package_id_path)
+                if package_id in physical_id_mapping:
+                    physical_id_mapping[package_id].append(entry[3:])
+                else:
+                    physical_id_mapping[package_id] = [entry[3:]]
+    return dict(sorted(physical_id_mapping.items()))
+
+
+def get_cluster_id_mapping():
+    """Returns dictionary with uncores and it package ID as key, value pairs """
+    cluster_id_mapping = {}
+    for entry in os.listdir(UNCORE_PATH):
+        if entry.startswith('uncore'):
+            uncore_fab_path = os.path.join(UNCORE_PATH, entry)
+            if os.path.isdir(uncore_fab_path):
+                fab_pkg_path = os.path.join(uncore_fab_path, "package_id")
+                if os.path.isfile(fab_pkg_path):
+                    with os.popen(f"cat {fab_pkg_path}") as f:
+                        uncore_output = f.read()
+                        cluster_id_mapping[entry] = uncore_output.strip()
+    return dict(sorted(cluster_id_mapping.items()))
+
+def get_package_id_mapping():
+    """Returns dictionary with package ID as key, value pairs """
+    cluster_id_mapping = {}
+
+    # make a regex so we can extract the pkg_id from the directory name.
+    pattern = re.compile(r'package_(\d+)')
+
+    for entry in os.listdir(UNCORE_PATH):
+        # look for a directory that starts with package_ and has a number.
+        match = pattern.match(entry)
+        if match:
+            pkg_id = match.group(1)
+            uncore_fab_path = os.path.join(UNCORE_PATH, entry)
+            if os.path.isdir(uncore_fab_path):
+                cluster_id_mapping[entry] = pkg_id
+    return dict(sorted(cluster_id_mapping.items()))
+
+def uncore_info():
+    """This function collects and prints uncore uncore information"""
+
+    directory = UNCORE_PATH[0:-1]
+
+    if not os.path.exists(directory):
+        print(f"Missing [{directory}], is kernel uncore driver installed?")
+        show_uncore_from_MSRs()
+        return
+
+    physical_id_mapping = get_physical_id_mapping()
+    if is_multi_uncore_sku():
+        cluster_id_mapping = get_cluster_id_mapping()
+    else:
+        cluster_id_mapping = get_package_id_mapping()
+
+
+    print("==================   ==========   ========   ==========================    ==============")
+    print("                                                  Uncore freq                     ")
+    print("Uncore Identifier    package Id     Die ID        Min      Max  Current         Core list")
+    print("==================   ==========   ========   ==========================    ==============")
+    for folder_name, value in cluster_id_mapping.items():
+        if folder_name is not None:
+            for pkg_id , cpus_list in physical_id_mapping.items():
+                if int(value.strip()) == int(pkg_id.strip()):
+                    uncore_fab_path = os.path.join(UNCORE_PATH, folder_name)
+                    cpu_dir_path = os.path.join(CPU_PATH, "cpu" + cpus_list[0])
+                    min_path = os.path.join(uncore_fab_path, UNCORE_MIN)
+                    max_path = os.path.join(uncore_fab_path, UNCORE_MAX)
+                    cur_path = os.path.join(uncore_fab_path, UNCORE_CUR)
+                    pkg_id_path = os.path.join(cpu_dir_path, TOPO_PKG)
+                    die_id_path = os.path.join(cpu_dir_path, TOPO_DIE_ID)
+                    core_list_path = os.path.join(cpu_dir_path, TOPO_SIBLING_LIST)
+
+                    uncore_min =  int(getfileval(min_path)) // MHZ_CONVERSION_FACTOR
+                    uncore_max =  int(getfileval(max_path)) // MHZ_CONVERSION_FACTOR
+                    try:
+                        uncore_cur =  int(getfileval(cur_path)) // MHZ_CONVERSION_FACTOR
+                    except (IOError, OSError) as err:
+                        uncore_cur = 0
+                    pkg_id_data = getfileval(pkg_id_path)
+                    die_id_data = getfileval(die_id_path)
+                    core_list_data = getfileval(core_list_path)
+                    print(f"{folder_name:<18}   {pkg_id_data:>10}  {die_id_data:>9}   {uncore_min:>8} {uncore_max:>8} {uncore_cur:>8}  {core_list_data:>16}")
+    print("")
 
 
 def listinfo(cpurange):
@@ -316,7 +454,6 @@ def listinfo(cpurange):
     if cstates != "":
         print(" ", end='')
 
-    print("========================", end='')
     print("")
 
     print("                         P-STATE INFO", end='')
@@ -324,7 +461,6 @@ def listinfo(cpurange):
         cstates_title = "C-STATES DISABLED?"
         print(f'{cstates_title:>{pointer_pos}}', end='')
 
-    print(f'{"UNCORE INFO":>25}', end='')
     print("")
 
     print("Core    Max    Min    Now    Governor", end='')
@@ -333,44 +469,23 @@ def listinfo(cpurange):
         name = getfileval(
             "/sys/devices/system/cpu/cpu0/cpuidle/" + x + "/name")
         print(" % 7s" % (name,), end='')
-    print("     Max      Min     Now", end='')
     print("")
 
     print("==== ====== ====== ====== ===========", end='')
     for x in cstates:
         print(" =======", end='')
-    print(" ======= ======== =======", end='')
     print("")
 
     for x in cpurange:
-        try:
-            cpu = getPkgId(x)
-            pkg_die_path = f"package_*{cpu}_die_*/"
-            path = os.path.join(UNCORE_PATH, pkg_die_path)
-            pkg_n_die_p = glob.glob(path)
-
-            if not pkg_n_die_p:
-                raise IOError("no sysfs entry for uncore_freq control")
-            min_path = os.path.join(pkg_n_die_p[0], UNCORE_MIN)
-            max_path = os.path.join(pkg_n_die_p[0], UNCORE_MAX)
-            cur_path = os.path.join(pkg_n_die_p[0], UNCORE_CUR)
-
-            uncore_min = int(getfileval(min_path)) // 1000
-            uncore_max = int(getfileval(max_path)) // 1000
-            uncore_cur = int(getfileval(cur_path)) // 1000
-        except (IOError, OSError):
-            uncore_min, uncore_max = get_min_max_uncore_freq_msr(x)
-            uncore_cur = get_cur_uncore_freq_msr(x)
-
         max = getfileval("/sys/devices/system/cpu/cpu" +
                          str(x) + "/cpufreq/scaling_max_freq")
         min = getfileval("/sys/devices/system/cpu/cpu" +
                          str(x) + "/cpufreq/scaling_min_freq")
         cur = getfileval("/sys/devices/system/cpu/cpu" +
                          str(x) + "/cpufreq/scaling_cur_freq")
-        max = int(max) // 1000
-        min = int(min) // 1000
-        cur = int(cur) // 1000
+        max = int(max) // MHZ_CONVERSION_FACTOR
+        min = int(min) // MHZ_CONVERSION_FACTOR
+        cur = int(cur) // MHZ_CONVERSION_FACTOR
         gov = getfileval("/sys/devices/system/cpu/cpu" +
                          str(x) + "/cpufreq/scaling_governor")
         print(f"{x:4} {max:>6} {min:>6} {cur:>6} {gov:>11}", end='')
@@ -381,7 +496,6 @@ def listinfo(cpurange):
                 print(" % 7s" % ("YES",), end='')
             else:
                 print(" % 7s" % ("no",), end='')
-        print(f" {uncore_max:>7} {uncore_min:>8} {uncore_cur:>7}", end='')
         print("")
     print("")
 
@@ -515,111 +629,77 @@ def get_sysfs_die_path(pkg):
     return die_path
 
 
-def set_uncore_max_msr(uncore_freq, cpurange):
-    """Set user passed uncore frequency as max freq using MSR."""
-    for core_id in cpurange:
-        try:
-            # Read all msr data as to not overwrite other MSR data on write
-            read_regstr = rdmsr(core_id, MSR_UNCORE_RATIO_LIMIT)
-            data = struct.unpack('BBBBBBBB', read_regstr)
-
-            # Update uncore desired max using bytes 0.
-            write_regstr = struct.pack('BBBBBBBB',
-                                       uncore_freq // 100,
-                                       data[1], data[2], data[3],
-                                       data[4], data[5], data[6],
-                                       data[7])
-            wrmsr(core_id, MSR_UNCORE_RATIO_LIMIT, write_regstr)
-        except (IOError, OSError) as err:
-            print(f"{err}:Could not set max uncore on core {core_id}")
+def set_uncore_sysfs(uncore_freq, uncore, path_constant):
+    """Set freq for the uncore using sysfs."""
+    cluster_info = "uncore" + uncore
+    min_path = os.path.join(UNCORE_PATH, cluster_info, path_constant)
+    print(f"Writing {uncore_freq} to {min_path}")
+    writetofile(str(uncore_freq * 1000), min_path)
+    print("")
 
 
-def set_uncore_max_sysfs(uncore_freq, cpurange):
-    """Set user passed uncore frequency as max freq using sysfs."""
-    for core_id in cpurange:
-        try:
-            pkg = getPkgId(core_id)
-            pkg_n_die_p = get_sysfs_die_path(pkg)
-            max_path = os.path.join(pkg_n_die_p, UNCORE_MAX)
-            print(f"Writing {uncore_freq} to {max_path}")
-            writetofile(str(uncore_freq * 1000), max_path)
-        except (IOError, OSError) as err:
-            raise IOError(f"{err}:Try setting using MSR on core {core_id}")
+def set_uncore_min_sysfs(uncore_freq, uncore):
+    """Set uncore_ freq as min freq for the uncore using sysfs."""
+    set_uncore_sysfs(uncore_freq, uncore, UNCORE_MIN)
 
 
-def set_uncore_min_msr(uncore_freq, cpurange):
-    """Set user passed uncore frequency as min freq using MSR."""
-    for core_id in cpurange:
-        try:
-            # Read all msr data as to not overwrite other MSR data on write
-            read_regstr = rdmsr(core_id, MSR_UNCORE_RATIO_LIMIT)
-            data = struct.unpack('BBBBBBBB', read_regstr)
-
-            # Update uncore desired min in byte 1.
-            write_regstr = struct.pack('BBBBBBBB',
-                                       data[0],
-                                       uncore_freq // 100,
-                                       data[2], data[3],
-                                       data[4], data[5], data[6],
-                                       data[7])
-            wrmsr(core_id, MSR_UNCORE_RATIO_LIMIT, write_regstr)
-        except (IOError, OSError) as err:
-            print(f"{err}:Could not set min uncore on core {core_id}")
+def set_uncore_max_sysfs(uncore_freq, uncore):
+    """Set uncore_ freq as max freq for the uncore using sysfs."""
+    set_uncore_sysfs(uncore_freq, uncore, UNCORE_MAX)
 
 
-def set_uncore_min_sysfs(uncore_freq, cpurange):
-    """Set user passed uncore frequency as min freq using sysfs."""
-    for core_id in cpurange:
-        try:
-            pkg = getPkgId(core_id)
-            pkg_n_die_p = get_sysfs_die_path(pkg)
-            min_path = os.path.join(pkg_n_die_p, UNCORE_MIN)
-            print(f"Writing {uncore_freq} to {min_path}")
-            writetofile(str(uncore_freq * 1000), min_path)
-        except (IOError, OSError) as err:
-            raise IOError(f"{err}: Try setting using MSR on core {core_id}")
-
-
-def validate_uncore_freq(package, uncore_freq):
+def get_uncore_from_user(min_freq, max_freq):
+    """With a valid user input the function sets min/max frequency"""
+    show_available_uncore_clusters()
+    pattern = r'^\d{2}$'
+    uncore = raw_input("Select uncore cluster:")
     try:
-        pkg_n_die_p = get_sysfs_die_path(package)
-        init_min_path = os.path.join(pkg_n_die_p, UNCORE_INIT_MIN)
-        init_max_path = os.path.join(pkg_n_die_p, UNCORE_INIT_MAX)
-        min_freq = int(getfileval(init_min_path)) // 1000
-        max_freq = int(getfileval(init_max_path)) // 1000
-    except (IOError, OSError, ValueError):
-        min_freq = UNCORE_HW_MIN
-        max_freq = UNCORE_HW_MAX
-
-    sup_uncore_freqs = list(range(min_freq, max_freq+100, 100))
-    if uncore_freq not in sup_uncore_freqs:
-        raise ValueError(f"Invalid uncore freq {uncore_freq}, "
-                         f"should be between {min_freq}Mhz-{max_freq}Mhz")
+        if re.match(pattern, uncore):
+            if min_freq:
+                set_uncore_min_sysfs(min_freq, uncore)
+            elif max_freq:
+                set_uncore_max_sysfs(max_freq, uncore)
+        else:
+            raise ValueError()
+    except(IOError, ValueError):
+        raise ValueError("\nError : Invalid value.\nEnter correct value shown in available uncore cluster \n")
 
 
 def set_uncore_freq(min_freq=None, max_freq=None):
-    # Uncore is changed for all cores
-    cpucount = getcpucount()
-    full_cpurange = range_expand('0-' + str(cpucount-1))
+    if (is_multi_uncore_sku()):
+        # Set frequency for specific uncore
+        print("\nUpdating uncore frequency...")
+        get_uncore_from_user(min_freq, max_freq)
+    else:
+        directory = UNCORE_PATH[0:-1]
+        if not os.path.exists(directory):
+            print(f"Missing [{directory}], is kernel uncore driver installed?")
+            return
 
-    pkgs = set(getPkgId(c) for c in full_cpurange)  # get all packages in cpu range
-    freqs = list(filter(None, (min_freq, max_freq)))  # get list of valid freqs
-
-    for p in pkgs:
-        for f in freqs:
-            validate_uncore_freq(p, f)
-
-    # all freqs are validated now, can just set them
-    if min_freq:
-        try:
-            set_uncore_min_sysfs(min_freq, full_cpurange)
-        except (IOError, OSError):
-            set_uncore_min_msr(min_freq, full_cpurange)
-    if max_freq:
-        try:
-            set_uncore_max_sysfs(max_freq, full_cpurange)
-        except (IOError, OSError):
-            set_uncore_max_msr(max_freq, full_cpurange)
+        # Set Uncore for all package ids
+        for entry in os.listdir(UNCORE_PATH):
+            if entry.startswith('package'):
+                try:
+                    initial_max_freq = int(getfileval(f"{UNCORE_PATH}/{entry}/{UNCORE_INIT_MAX}")) // MHZ_CONVERSION_FACTOR
+                    initial_min_freq = int(getfileval(f"{UNCORE_PATH}/{entry}/{UNCORE_INIT_MIN}")) // MHZ_CONVERSION_FACTOR
+                except (IOError, OSError) as err:
+                    raise IOError(f"{err}: failed to get initial min/max uncore frequency")
+                if max_freq:
+                    if (max_freq < initial_min_freq) or (max_freq > initial_max_freq):
+                        raise ValueError("\nError : value outside allowed min/max range\n")
+                    try:
+                        writetofile(str(max_freq * MHZ_CONVERSION_FACTOR), f"{UNCORE_PATH}/{entry}/{UNCORE_MAX}")
+                        print(f"Set maximum uncore frequency to {max_freq} for {entry}")
+                    except (IOError, OSError) as err:
+                        raise IOError(f"{err}: failed to set max uncore frequency")
+                if min_freq:
+                    if min_freq < initial_min_freq or min_freq > initial_max_freq:
+                        raise ValueError("\nError : value outside allowed min/max range\n")
+                    try:
+                        writetofile(str(min_freq * MHZ_CONVERSION_FACTOR), f"{UNCORE_PATH}/{entry}/{UNCORE_MIN}")
+                        print(f"Set minimum uncore frequency to {min_freq} for {entry}")
+                    except (IOError, OSError) as err:
+                        raise IOError(f"{err}: failed to set min uncore frequency")
 
 
 def range_expand(s):
@@ -655,8 +735,9 @@ def show_help():
     print('   <no params>   use interactive menu')
     print('   -h            Show this help')
     print('   -i            Show information on available freqs, C-States, etc')
+    print('   -f            Show UNCORE information')
     print('   -l            List information on each core')
-    print('   -L <sec>      List information on each core repeatedly at <sec> intervals')
+    print('   -L <sec>      List information repeatedly at <sec> intervals (need -l or -f, or both)')
     print('   -M <freq>     Set core maximum frequency. Can also use "max", "min", or "base"')
     print('   -m <freq>     Set core minimum frequency. Can also use "max", "min", or "base"')
     print('   -s <freq>     Set core frequency (within min and max)')
@@ -683,6 +764,14 @@ def show_help():
     print('   this assumes there\'s a 2501 and a 2500 freq available.')
     print()
     print('   ' + scriptname + ' -g userspace -r 1 -M 2501 -s 2501')
+    print()
+    print('4. Display information on the uncore')
+    print()
+    print('   ' + scriptname + ' -f')
+    print()
+    print('5. Display information about core and uncore every second')
+    print()
+    print('   ' + scriptname + ' -L 1 -lf')
     print()
 
 
@@ -726,7 +815,7 @@ def do_menu(cpurange):
     print("[8] Enable C-State for a range of cores")
     print("[9] Disable C-State for a range of cores")
     print("")
-    print("[10] Display Available Uncore Freqs")
+    print("[10] Display Uncore Information")
     print("[11] Set Uncore Maximum for a range of cores")
     print("[12] Set Uncore Minimum for a range of cores")
     print("")
@@ -807,6 +896,7 @@ def do_menu(cpurange):
         set_cstate(cstate, 1, cpurange)
     # ("[10] Set Uncore Maximum for a range of cores")
     elif text == "10":
+        uncore_info()
         freqs = show_uncore_freqs()
     # ("[11] Set Uncore Maximum for a range of cores")
     elif text == "11":
@@ -842,112 +932,138 @@ def do_menu(cpurange):
         print("")
         print("Unknown Option")
 
+def main():
+    global driver
 
-if (check_driver() == 0):
-    print("Invalid Driver : [" + driver + "]")
-    sys.exit(1)
+    driver = "unknown"
+    if (check_driver() == 0):
+        print("Invalid Driver : [" + driver + "]")
+        sys.exit(1)
 
-try:
-    opts, args = getopt.getopt(sys.argv[1:], "hilM:m:r:s:g:e:d:U:u:TtL:", [
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "hilM:m:r:s:g:e:d:U:u:TtL:f", [
                                "maxfreq=", "minfreq=", "range="])
-except getopt.GetoptError:
-    print('d.py -x <maxfreq>')
-    sys.exit(-1)
-
-cpucount = getcpucount()
-cpurange = range_expand('0-' + str(cpucount-1))
-
-scriptname = sys.argv[0]
-
-if (len(opts) == 0):
-    while(1):
-        do_menu(cpurange)
-        print("")
-        raw_input("Press enter to continue ... ")
-        print("")
-
-
-for opt, arg in opts:
-    if opt in ("-r", "--range"):
-        cpurange = range_expand(arg)
-        print("Working with cores: " + str(cpurange))
-
-for opt, arg in opts:
-    if opt == '-h':
+    except getopt.GetoptError:
         show_help()
-        sys.exit()
-    if opt == '-i':
-        getinfo()
-        sys.exit()
-    if opt == '-l':
-        listinfo(cpurange)
-        sys.exit()
-    if opt in ("-L"):
-        list_interval = int(arg)
-        print("Using list interval of " + str(list_interval) + " seconds.")
+        sys.exit(-1)
+
+    cpucount = getcpucount()
+    cpurange = range_expand('0-' + str(cpucount-1))
+
+    if (len(opts) == 0):
         while(1):
+            do_menu(cpurange)
+            print("")
+            raw_input("Press enter to continue ... ")
+            print("")
+
+    for opt, arg in opts:
+        if opt in ("-r", "--range"):
+            cpurange = range_expand(arg)
+            print("Working with cores: " + str(cpurange))
+
+    l_flag = 0
+    u_flag = 0
+
+    for opt, arg in opts:
+        if opt == '-l':
+            l_flag = 1
+        if opt == '-f':
+            u_flag = 1
+
+    for opt, arg in opts:
+        if opt == '-h':
+            show_help()
+            sys.exit()
+        if opt == '-i':
+            getinfo()
+            sys.exit()
+        if opt in ("-L"):
+            if not l_flag and not u_flag:
+                print("ERROR: Need to specify -l or -f when using interval mode.")
+                sys.exit()
+            list_interval = int(arg)
+            print("Using list interval of " + str(list_interval) + " seconds.")
+            while(1):
+                if l_flag:
+                    listinfo(cpurange)
+                if u_flag:
+                    uncore_info()
+                time.sleep(list_interval)
+
+    for opt, arg in opts:
+        if opt == '-l':
             listinfo(cpurange)
-            time.sleep(list_interval)
+            l_flag = 1
+        if opt == '-f':
+            uncore_info()
+            u_flag = 1
 
-for opt, arg in opts:
-    if opt in ("-M", "--maxfreq"):
-        setfreq = None
-        if arg.lower() == "max":
-            setfreq = max(get_pstates()) * 1000
-        elif arg.lower() == "min":
-            setfreq = min(get_pstates()) * 1000
-        elif arg.lower() == "base":
-            setfreq = get_cpu_base_frequency(0) * 1000
-        else:
-            setfreq = int(arg) * 1000
-        print(f"Setting maxfreq to: {setfreq}")
-        set_max_cpu_freq(setfreq, cpurange)
-    if opt in ("-m", "--minfreq"):
-        setfreq = None
-        if arg.lower() == "max":
-            setfreq = max(get_pstates()) * 1000
-        elif arg.lower() == "min":
-            setfreq = min(get_pstates()) * 1000
-        elif arg.lower() == "base":
-            setfreq = get_cpu_base_frequency(0) * 1000
-        else:
-            setfreq = int(arg) * 1000
-        print(f"Setting minfreq to: {setfreq}")
-        set_min_cpu_freq(setfreq, cpurange)
-    if opt in ("-g", "--governor"):
-        set_governor(arg, cpurange)
-    if opt in ("-e", "--enable"):
-        set_cstate(arg, 0, cpurange)
-    if opt in ("-d", "--disable"):
-        set_cstate(arg, 1, cpurange)
-    if opt in ("-U", "--maxUncore"):
-        try:
-            set_uncore_freq(max_freq=int(arg))
-        except ValueError as err:
-            print(err)
-    if opt in ("-u", "--minUncore"):
-        try:
-            set_uncore_freq(min_freq=int(arg))
-        except ValueError as err:
-            print(err)
-    if opt in "-T":
-        print("Enabling Turbo")
-        set_turbo(0)
-    if opt in "-t":
-        print("Disabling Turbo")
-        set_turbo(1)
-for opt, arg in opts:
-    if opt in ("-s", "--setfreq"):
+    if l_flag or u_flag:
+        sys.exit()
 
-        drvFile = open(DRV_FILE, 'r')
-        driver = drvFile.readline().strip("\n")
-        drvFile.close()
-        if driver == "acpi-cpufreq":
-            setfreq = int(arg) * 1000
-            set_cpu_freq(setfreq, cpurange)
-        else:
-            print()
-            print("Error: setspeed not supported without acpi-cpufreq driver.")
-            print("       Please add 'intel_pstate=disable' to kernel boot")
-            print("       parameters, or use maxfreq and minfreq together.")
-            print()
+    for opt, arg in opts:
+        if opt in ("-M", "--maxfreq"):
+            setfreq = None
+            if arg.lower() == "max":
+                setfreq = max(get_pstates()) * 1000
+            elif arg.lower() == "min":
+                setfreq = min(get_pstates()) * 1000
+            elif arg.lower() == "base":
+                setfreq = get_cpu_base_frequency(0) * 1000
+            else:
+                setfreq = int(arg) * 1000
+            print(f"Setting maxfreq to: {setfreq}")
+            set_max_cpu_freq(setfreq, cpurange)
+        if opt in ("-m", "--minfreq"):
+            setfreq = None
+            if arg.lower() == "max":
+                setfreq = max(get_pstates()) * 1000
+            elif arg.lower() == "min":
+                setfreq = min(get_pstates()) * 1000
+            elif arg.lower() == "base":
+                setfreq = get_cpu_base_frequency(0) * 1000
+            else:
+                setfreq = int(arg) * 1000
+            print(f"Setting minfreq to: {setfreq}")
+            set_min_cpu_freq(setfreq, cpurange)
+        if opt in ("-g", "--governor"):
+            set_governor(arg, cpurange)
+        if opt in ("-e", "--enable"):
+            set_cstate(arg, 0, cpurange)
+        if opt in ("-d", "--disable"):
+            set_cstate(arg, 1, cpurange)
+        if opt in ("-U", "--maxUncore"):
+            try:
+                set_uncore_freq(max_freq=int(arg))
+            except ValueError as err:
+                print(err)
+        if opt in ("-u", "--minUncore"):
+            try:
+                set_uncore_freq(min_freq=int(arg))
+            except ValueError as err:
+                print(err)
+        if opt in "-T":
+            print("Enabling Turbo")
+            set_turbo(0)
+        if opt in "-t":
+            print("Disabling Turbo")
+            set_turbo(1)
+    for opt, arg in opts:
+        if opt in ("-s", "--setfreq"):
+
+            drvFile = open(DRV_FILE, 'r')
+            driver = drvFile.readline().strip("\n")
+            drvFile.close()
+            if driver == "acpi-cpufreq":
+                setfreq = int(arg) * 1000
+                set_cpu_freq(setfreq, cpurange)
+            else:
+                print()
+                print("Error: setspeed not supported without acpi-cpufreq driver.")
+                print("       Please add 'intel_pstate=disable' to kernel boot")
+                print("       parameters, or use maxfreq and minfreq together.")
+                print()
+
+if __name__ == "__main__":
+    main()
