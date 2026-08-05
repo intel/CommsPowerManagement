@@ -1,4 +1,4 @@
-From 7b040278389eeb241e81cda448597c8341cc4b03 Mon Sep 17 00:00:00 2001
+From f75258c3bde7aa97dcae97a01e6fb8eb59138099 Mon Sep 17 00:00:00 2001
 From: Hoang Nguyen <hoang1x.nguyen@intel.com>
 Date: Thu, 1 Aug 2024 16:11:56 +0000
 Subject: [PATCH 2/3] eal: add cpuset lcore telemetry entries
@@ -11,10 +11,10 @@ Signed-off-by: Anatoly Burakov <anatoly.burakov@intel.com>
  1 file changed, 46 insertions(+)
 
 diff --git a/lib/eal/common/eal_common_lcore_telemetry.c b/lib/eal/common/eal_common_lcore_telemetry.c
-index 1478e5a..f01ccd9 100644
+index df7eab1fd4..8a6d13c57c 100644
 --- a/lib/eal/common/eal_common_lcore_telemetry.c
 +++ b/lib/eal/common/eal_common_lcore_telemetry.c
-@@ -263,6 +263,49 @@ lcore_handle_busyness(const char *cmd __rte_unused,
+@@ -269,6 +269,49 @@ lcore_handle_busyness(const char *cmd __rte_unused,
  	return 0;
  }
  
@@ -64,7 +64,7 @@ index 1478e5a..f01ccd9 100644
  void
  eal_lcore_telemetry_free(void)
  {
-@@ -289,6 +332,9 @@ RTE_INIT(lcore_init_telemetry)
+@@ -295,6 +338,9 @@ RTE_INIT(lcore_init_telemetry)
  	rte_telemetry_register_cmd("/eal/lcore/busyness_disable", lcore_busyness_disable,
  				   "disable lcore busyness measurement");
  
