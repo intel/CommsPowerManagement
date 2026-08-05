@@ -1,4 +1,4 @@
-From df16c36f9740fe7f204e3ecc4bb985d63992a26c Mon Sep 17 00:00:00 2001
+From e9e3baf4a86cbd4f4e7eb03fc17d04b07b6cef82 Mon Sep 17 00:00:00 2001
 From: David Hunt <david.hunt@intel.com>
 Date: Fri, 20 Sep 2024 09:11:45 +0100
 Subject: [PATCH 3/3] add capacity endpoint to telemetry thread
@@ -13,19 +13,18 @@ P1, it should show 50% regardless of what the current frequency is.
 
 Signed-off-by: David Hunt <david.hunt@intel.com>
 ---
- lib/eal/common/eal_common_lcore_telemetry.c | 241 ++++++++++++++++++++
+ lib/eal/common/eal_common_lcore_telemetry.c | 243 ++++++++++++++++++++
  lib/eal/include/rte_lcore.h                 |  21 ++
- lib/eal/version.map                         |   1 +
- 3 files changed, 263 insertions(+)
+ 2 files changed, 264 insertions(+)
 
 diff --git a/lib/eal/common/eal_common_lcore_telemetry.c b/lib/eal/common/eal_common_lcore_telemetry.c
-index f01ccd9..1c6d085 100644
+index 8a6d13c57c..54d826069c 100644
 --- a/lib/eal/common/eal_common_lcore_telemetry.c
 +++ b/lib/eal/common/eal_common_lcore_telemetry.c
-@@ -10,9 +10,18 @@
- #include <rte_cycles.h>
+@@ -11,9 +11,18 @@
  #include <rte_errno.h>
  #include <rte_lcore.h>
+ #include <eal_export.h>
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <fcntl.h>
@@ -40,8 +39,8 @@ index f01ccd9..1c6d085 100644
 +#define POWER_SYSFS_MSR_PATH    "/dev/cpu/%u/msr"
  #endif
  
- int __rte_lcore_telemetry_enabled;
-@@ -47,6 +56,183 @@ static struct lcore_telemetry *telemetry_data;
+ RTE_EXPORT_EXPERIMENTAL_SYMBOL(__rte_lcore_telemetry_enabled, 20.11);
+@@ -49,6 +58,183 @@ static struct lcore_telemetry *telemetry_data;
  #define SMOOTH_COEFF 5
  #define STATE_CHANGE_OPT 32
  
@@ -225,10 +224,11 @@ index f01ccd9..1c6d085 100644
  /* Helper function to check if the lcore is enabled.
   * Cannot use rte_lcore_is_enabled since it only catches ROLE_RTE threads which
   * does not include ROLE_NON_EAL threads which some application threads, for
-@@ -102,6 +288,33 @@ int rte_lcore_busyness(unsigned int lcore_id)
+@@ -105,6 +291,34 @@ int rte_lcore_busyness(unsigned int lcore_id)
  	return telemetry_data[lcore_id].busyness;
  }
  
++RTE_EXPORT_EXPERIMENTAL_SYMBOL(rte_lcore_capacity, 20.11);
 +int rte_lcore_capacity(unsigned int lcore_id)
 +{
 +	const uint64_t active_thresh = RTE_LCORE_BUSYNESS_PERIOD * 1000;
@@ -243,7 +243,7 @@ index f01ccd9..1c6d085 100644
 +		return LCORE_BUSYNESS_NOT_SET;
 +	/* if the core hasn't been active in a while */
 +	else if ((rte_rdtsc() - tdata->interval_ts) > active_thresh)
-+		return LCORE_BUSYNESS_NOT_SET;
++	return LCORE_BUSYNESS_NOT_SET;
 +
 +	int cur_freq = read_sysfs_cur_freq(rte_lcore_to_cpu_id(lcore_id));
 +	int busy = telemetry_data[lcore_id].busyness;
@@ -256,10 +256,10 @@ index f01ccd9..1c6d085 100644
 +	}
 +}
 +
+ RTE_EXPORT_EXPERIMENTAL_SYMBOL(rte_lcore_busyness_enabled, 20.11);
  int rte_lcore_busyness_enabled(void)
  {
- 	return __rte_lcore_telemetry_enabled;
-@@ -263,6 +476,26 @@ lcore_handle_busyness(const char *cmd __rte_unused,
+@@ -269,6 +483,26 @@ lcore_handle_busyness(const char *cmd __rte_unused,
  	return 0;
  }
  
@@ -286,7 +286,7 @@ index f01ccd9..1c6d085 100644
  static int
  lcore_handle_cpuset(const char *cmd __rte_unused,
  		    const char *params __rte_unused,
-@@ -326,6 +559,9 @@ RTE_INIT(lcore_init_telemetry)
+@@ -332,6 +566,9 @@ RTE_INIT(lcore_init_telemetry)
  	rte_telemetry_register_cmd("/eal/lcore/busyness", lcore_handle_busyness,
  				   "return percentage busyness of cores");
  
@@ -296,23 +296,24 @@ index f01ccd9..1c6d085 100644
  	rte_telemetry_register_cmd("/eal/lcore/busyness_enable", lcore_busyness_enable,
  				   "enable lcore busyness measurement");
  
-@@ -340,6 +576,11 @@ RTE_INIT(lcore_init_telemetry)
+@@ -346,6 +583,12 @@ RTE_INIT(lcore_init_telemetry)
  
  #else
  
++RTE_EXPORT_EXPERIMENTAL_SYMBOL(rte_lcore_capacity, 20.11);
 +int rte_lcore_capacity(unsigned int lcore_id __rte_unused)
 +{
 +	return -ENOTSUP;
 +}
 +
+ RTE_EXPORT_EXPERIMENTAL_SYMBOL(rte_lcore_busyness, 20.11);
  int rte_lcore_busyness(unsigned int lcore_id __rte_unused)
  {
- 	return -ENOTSUP;
 diff --git a/lib/eal/include/rte_lcore.h b/lib/eal/include/rte_lcore.h
-index 3c64774..dffb7d1 100644
+index 1d0a5a22f6..7af3532b17 100644
 --- a/lib/eal/include/rte_lcore.h
 +++ b/lib/eal/include/rte_lcore.h
-@@ -426,6 +426,27 @@ __rte_experimental
+@@ -421,6 +421,27 @@ __rte_experimental
  int
  rte_lcore_busyness(unsigned int lcore_id);
  
@@ -340,18 +341,6 @@ index 3c64774..dffb7d1 100644
  /**
   * @warning
   * @b EXPERIMENTAL: this API may change without prior notice.
-diff --git a/lib/eal/version.map b/lib/eal/version.map
-index a4451d5..a2a3ba0 100644
---- a/lib/eal/version.map
-+++ b/lib/eal/version.map
-@@ -440,6 +440,7 @@ EXPERIMENTAL {
- 	# added in 20.11
- 	__rte_lcore_telemetry_timestamp;
- 	__rte_lcore_telemetry_enabled;
-+	rte_lcore_capacity;
- 	rte_lcore_busyness;
- 	rte_lcore_busyness_enabled;
- 	rte_lcore_busyness_enabled_set;
 -- 
 2.43.0
 

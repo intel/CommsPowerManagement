@@ -1,4 +1,4 @@
-From 1b43ac9e21b34064e508bf5c489722c0fc208f8c Mon Sep 17 00:00:00 2001
+From 4add769c8ac877b842cb5d5e5b6def5d6095b381 Mon Sep 17 00:00:00 2001
 From: David Hunt <david.hunt@intel.com>
 Date: Fri, 20 Sep 2024 09:11:45 +0100
 Subject: [PATCH 3/3] add capacity endpoint to telemetry thread
@@ -19,7 +19,7 @@ Signed-off-by: David Hunt <david.hunt@intel.com>
  3 files changed, 263 insertions(+)
 
 diff --git a/lib/eal/common/eal_common_lcore_telemetry.c b/lib/eal/common/eal_common_lcore_telemetry.c
-index f01ccd9a65..1c6d085a55 100644
+index f01ccd9..1c6d085 100644
 --- a/lib/eal/common/eal_common_lcore_telemetry.c
 +++ b/lib/eal/common/eal_common_lcore_telemetry.c
 @@ -10,9 +10,18 @@
@@ -309,7 +309,7 @@ index f01ccd9a65..1c6d085a55 100644
  {
  	return -ENOTSUP;
 diff --git a/lib/eal/include/rte_lcore.h b/lib/eal/include/rte_lcore.h
-index 6fb5a679be..4838e3e02b 100644
+index 6fb5a67..4838e3e 100644
 --- a/lib/eal/include/rte_lcore.h
 +++ b/lib/eal/include/rte_lcore.h
 @@ -422,6 +422,27 @@ __rte_experimental
@@ -341,7 +341,7 @@ index 6fb5a679be..4838e3e02b 100644
   * @warning
   * @b EXPERIMENTAL: this API may change without prior notice.
 diff --git a/lib/eal/version.map b/lib/eal/version.map
-index 459194b45a..33292379eb 100644
+index 701da62..7f21a83 100644
 --- a/lib/eal/version.map
 +++ b/lib/eal/version.map
 @@ -444,6 +444,7 @@ EXPERIMENTAL {

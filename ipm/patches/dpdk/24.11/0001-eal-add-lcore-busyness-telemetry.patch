@@ -1,6 +1,6 @@
-From 79bf3a1bbf2a1d4b5327c1278bfd05eaaa325d96 Mon Sep 17 00:00:00 2001
-From: Anatoly Burakov <anatoly.burakov@intel.com>
-Date: Fri, 20 Sep 2024 09:08:28 +0100
+From c6e891ddb9141325b65fbf2d94a8afb2fc5f9f5a Mon Sep 17 00:00:00 2001
+From: Kevin Laatz <kevin.laatz@intel.com>
+Date: Wed, 22 Apr 2026 11:17:49 +0000
 Subject: [PATCH 1/3] eal: add lcore busyness telemetry
 
 Currently, there is no way to measure lcore busyness in a passive way,
@@ -73,7 +73,7 @@ Signed-off-by: Anatoly Burakov <anatoly.burakov@intel.com>
  create mode 100644 lib/eal/common/eal_common_lcore_telemetry.c
 
 diff --git a/config/rte_config.h b/config/rte_config.h
-index 3734db6bdc..11feae586c 100644
+index 3734db6..11feae5 100644
 --- a/config/rte_config.h
 +++ b/config/rte_config.h
 @@ -51,6 +51,8 @@
@@ -86,7 +86,7 @@ index 3734db6bdc..11feae586c 100644
  /* bsd module defines */
  #define RTE_CONTIGMEM_MAX_NUM_BUFS 64
 diff --git a/lib/bbdev/rte_bbdev.h b/lib/bbdev/rte_bbdev.h
-index 6d5cdc7b8c..80dc3b075b 100644
+index 6d5cdc7..80dc3b0 100644
 --- a/lib/bbdev/rte_bbdev.h
 +++ b/lib/bbdev/rte_bbdev.h
 @@ -25,6 +25,7 @@
@@ -142,7 +142,7 @@ index 6d5cdc7b8c..80dc3b075b 100644
  
  /**
 diff --git a/lib/compressdev/rte_compressdev.c b/lib/compressdev/rte_compressdev.c
-index cf2c20a704..04a854a935 100644
+index cf2c20a..04a854a 100644
 --- a/lib/compressdev/rte_compressdev.c
 +++ b/lib/compressdev/rte_compressdev.c
 @@ -587,6 +587,8 @@ rte_compressdev_dequeue_burst(uint8_t dev_id, uint16_t qp_id,
@@ -155,10 +155,10 @@ index cf2c20a704..04a854a935 100644
  }
  
 diff --git a/lib/cryptodev/rte_cryptodev.h b/lib/cryptodev/rte_cryptodev.h
-index c64d2f83a0..da4b7fffbf 100644
+index 071ff3d..b6ec34a 100644
 --- a/lib/cryptodev/rte_cryptodev.h
 +++ b/lib/cryptodev/rte_cryptodev.h
-@@ -2007,6 +2007,8 @@ rte_cryptodev_dequeue_burst(uint8_t dev_id, uint16_t qp_id,
+@@ -2016,6 +2016,8 @@ rte_cryptodev_dequeue_burst(uint8_t dev_id, uint16_t qp_id,
  		rte_rcu_qsbr_thread_offline(list->qsbr, 0);
  	}
  #endif
@@ -168,7 +168,7 @@ index c64d2f83a0..da4b7fffbf 100644
  }
  
 diff --git a/lib/distributor/rte_distributor.c b/lib/distributor/rte_distributor.c
-index e58727cdc2..9396a62edd 100644
+index e58727c..9396a62 100644
 --- a/lib/distributor/rte_distributor.c
 +++ b/lib/distributor/rte_distributor.c
 @@ -58,6 +58,8 @@ rte_distributor_request_pkt(struct rte_distributor *d,
@@ -218,7 +218,7 @@ index e58727cdc2..9396a62edd 100644
  }
  
 diff --git a/lib/distributor/rte_distributor_single.c b/lib/distributor/rte_distributor_single.c
-index d4b3e12648..3c18805ecd 100644
+index d4b3e12..3c18805 100644
 --- a/lib/distributor/rte_distributor_single.c
 +++ b/lib/distributor/rte_distributor_single.c
 @@ -31,8 +31,13 @@ rte_distributor_request_pkt_single(struct rte_distributor_single *d,
@@ -251,10 +251,10 @@ index d4b3e12648..3c18805ecd 100644
  }
  
 diff --git a/lib/dmadev/rte_dmadev.h b/lib/dmadev/rte_dmadev.h
-index 2f9304a9db..3876cf1556 100644
+index e2c8615..5da6a29 100644
 --- a/lib/dmadev/rte_dmadev.h
 +++ b/lib/dmadev/rte_dmadev.h
-@@ -148,6 +148,8 @@
+@@ -149,6 +149,8 @@
  
  #include <rte_bitops.h>
  #include <rte_common.h>
@@ -263,7 +263,7 @@ index 2f9304a9db..3876cf1556 100644
  
  #ifdef __cplusplus
  extern "C" {
-@@ -1068,6 +1070,7 @@ rte_dma_completed(int16_t dev_id, uint16_t vchan, const uint16_t nb_cpls,
+@@ -1069,6 +1071,7 @@ rte_dma_completed(int16_t dev_id, uint16_t vchan, const uint16_t nb_cpls,
  				has_error);
  	rte_dma_trace_completed(dev_id, vchan, nb_cpls, last_idx, has_error,
  				ret);
@@ -271,7 +271,7 @@ index 2f9304a9db..3876cf1556 100644
  
  	return ret;
  }
-@@ -1120,6 +1123,7 @@ rte_dma_completed_status(int16_t dev_id, uint16_t vchan,
+@@ -1121,6 +1124,7 @@ rte_dma_completed_status(int16_t dev_id, uint16_t vchan,
  				       last_idx, status);
  	rte_dma_trace_completed_status(dev_id, vchan, nb_cpls, last_idx, status,
  				       ret);
@@ -281,7 +281,7 @@ index 2f9304a9db..3876cf1556 100644
  }
 diff --git a/lib/eal/common/eal_common_lcore_telemetry.c b/lib/eal/common/eal_common_lcore_telemetry.c
 new file mode 100644
-index 0000000000..1478e5a48a
+index 0000000..1478e5a
 --- /dev/null
 +++ b/lib/eal/common/eal_common_lcore_telemetry.c
 @@ -0,0 +1,319 @@
@@ -605,7 +605,7 @@ index 0000000000..1478e5a48a
 +
 +#endif
 diff --git a/lib/eal/common/meson.build b/lib/eal/common/meson.build
-index e273745e93..96afcd7825 100644
+index e273745..96afcd7 100644
 --- a/lib/eal/common/meson.build
 +++ b/lib/eal/common/meson.build
 @@ -17,6 +17,7 @@ sources += files(
@@ -617,19 +617,19 @@ index e273745e93..96afcd7825 100644
          'eal_common_lcore_var.c',
          'eal_common_mcfg.c',
 diff --git a/lib/eal/freebsd/eal.c b/lib/eal/freebsd/eal.c
-index a96bbf5836..26d6b6a703 100644
+index 7aec419..237d911 100644
 --- a/lib/eal/freebsd/eal.c
 +++ b/lib/eal/freebsd/eal.c
-@@ -901,6 +901,7 @@ rte_eal_cleanup(void)
- 	eal_bus_cleanup();
+@@ -908,6 +908,7 @@ rte_eal_cleanup(void)
+ 	rte_eal_alarm_cleanup();
  	rte_trace_save();
  	eal_trace_fini();
 +	eal_lcore_telemetry_free();
- 	rte_eal_alarm_cleanup();
  	/* after this point, any DPDK pointers will become dangling */
  	rte_eal_memory_detach();
+ 	eal_cleanup_config(internal_conf);
 diff --git a/lib/eal/include/rte_lcore.h b/lib/eal/include/rte_lcore.h
-index 549b9e68c5..6fb5a679be 100644
+index 549b9e6..6fb5a67 100644
 --- a/lib/eal/include/rte_lcore.h
 +++ b/lib/eal/include/rte_lcore.h
 @@ -403,6 +403,90 @@ rte_thread_register(void);
@@ -724,19 +724,19 @@ index 549b9e68c5..6fb5a679be 100644
  }
  #endif
 diff --git a/lib/eal/linux/eal.c b/lib/eal/linux/eal.c
-index a6220524a4..9389e24d70 100644
+index a1e95c5..c626336 100644
 --- a/lib/eal/linux/eal.c
 +++ b/lib/eal/linux/eal.c
-@@ -1323,6 +1323,7 @@ rte_eal_cleanup(void)
- 	eal_bus_cleanup();
+@@ -1329,6 +1329,7 @@ rte_eal_cleanup(void)
+ 	rte_eal_alarm_cleanup();
  	rte_trace_save();
  	eal_trace_fini();
 +	eal_lcore_telemetry_free();
  	eal_mp_dev_hotplug_cleanup();
- 	rte_eal_alarm_cleanup();
  	/* after this point, any DPDK pointers will become dangling */
+ 	rte_eal_memory_detach();
 diff --git a/lib/eal/meson.build b/lib/eal/meson.build
-index e1d6c4cf17..833d33138c 100644
+index e1d6c4c..833d331 100644
 --- a/lib/eal/meson.build
 +++ b/lib/eal/meson.build
 @@ -17,6 +17,9 @@ subdir(arch_subdir)
@@ -750,7 +750,7 @@ index e1d6c4cf17..833d33138c 100644
  if dpdk_conf.has('RTE_USE_LIBBSD')
      ext_deps += libbsd
 diff --git a/lib/eal/version.map b/lib/eal/version.map
-index a20c713eb1..459194b45a 100644
+index e2a622c..701da62 100644
 --- a/lib/eal/version.map
 +++ b/lib/eal/version.map
 @@ -388,6 +388,65 @@ EXPERIMENTAL {
@@ -820,7 +820,7 @@ index a20c713eb1..459194b45a 100644
  	# added in 23.03
  	__rte_eal_trace_generic_blob;
 diff --git a/lib/ethdev/rte_ethdev.h b/lib/ethdev/rte_ethdev.h
-index 1f71cad244..4e011384c2 100644
+index ea3487d..cbad062 100644
 --- a/lib/ethdev/rte_ethdev.h
 +++ b/lib/ethdev/rte_ethdev.h
 @@ -6314,6 +6314,8 @@ rte_eth_rx_burst(uint16_t port_id, uint16_t queue_id,
@@ -833,10 +833,10 @@ index 1f71cad244..4e011384c2 100644
  }
  
 diff --git a/lib/eventdev/rte_eventdev.h b/lib/eventdev/rte_eventdev.h
-index fabd1490db..df0de1ae9a 100644
+index 7649882..f802c82 100644
 --- a/lib/eventdev/rte_eventdev.h
 +++ b/lib/eventdev/rte_eventdev.h
-@@ -2829,6 +2829,7 @@ rte_event_dequeue_burst(uint8_t dev_id, uint8_t port_id, struct rte_event ev[],
+@@ -2830,6 +2830,7 @@ rte_event_dequeue_burst(uint8_t dev_id, uint8_t port_id, struct rte_event ev[],
  			uint16_t nb_events, uint64_t timeout_ticks)
  {
  	const struct rte_event_fp_ops *fp_ops;
@@ -844,7 +844,7 @@ index fabd1490db..df0de1ae9a 100644
  	void *port;
  
  	fp_ops = &rte_event_fp_ops[dev_id];
-@@ -2847,7 +2848,10 @@ rte_event_dequeue_burst(uint8_t dev_id, uint8_t port_id, struct rte_event ev[],
+@@ -2848,7 +2849,10 @@ rte_event_dequeue_burst(uint8_t dev_id, uint8_t port_id, struct rte_event ev[],
  #endif
  	rte_eventdev_trace_deq_burst(dev_id, port_id, ev, nb_events);
  
@@ -857,7 +857,7 @@ index fabd1490db..df0de1ae9a 100644
  
  #define RTE_EVENT_DEV_MAINT_OP_FLUSH          (1 << 0)
 diff --git a/lib/rawdev/rte_rawdev.c b/lib/rawdev/rte_rawdev.c
-index 4f8897b639..2403c78925 100644
+index bf81c9b..4c9518e 100644
 --- a/lib/rawdev/rte_rawdev.c
 +++ b/lib/rawdev/rte_rawdev.c
 @@ -237,13 +237,16 @@ rte_rawdev_dequeue_buffers(uint16_t dev_id,
@@ -879,7 +879,7 @@ index 4f8897b639..2403c78925 100644
  
  int
 diff --git a/lib/regexdev/rte_regexdev.h b/lib/regexdev/rte_regexdev.h
-index b18a1d4251..5d4a84eab5 100644
+index b18a1d4..5d4a84e 100644
 --- a/lib/regexdev/rte_regexdev.h
 +++ b/lib/regexdev/rte_regexdev.h
 @@ -1531,6 +1531,7 @@ rte_regexdev_dequeue_burst(uint8_t dev_id, uint16_t qp_id,
@@ -902,7 +902,7 @@ index b18a1d4251..5d4a84eab5 100644
  
  #ifdef __cplusplus
 diff --git a/lib/ring/rte_ring.h b/lib/ring/rte_ring.h
-index 11ca69c73d..7f612dbb71 100644
+index 11ca69c..7f612db 100644
 --- a/lib/ring/rte_ring.h
 +++ b/lib/ring/rte_ring.h
 @@ -411,8 +411,10 @@ static __rte_always_inline unsigned int
@@ -930,7 +930,7 @@ index 11ca69c73d..7f612dbb71 100644
  
  #ifdef __cplusplus
 diff --git a/lib/ring/rte_ring_elem_pvt.h b/lib/ring/rte_ring_elem_pvt.h
-index 4b80f58980..e2a72e3ea7 100644
+index 4b80f58..e2a72e3 100644
 --- a/lib/ring/rte_ring_elem_pvt.h
 +++ b/lib/ring/rte_ring_elem_pvt.h
 @@ -385,6 +385,7 @@ __rte_ring_do_dequeue_elem(struct rte_ring *r, void *obj_table,
