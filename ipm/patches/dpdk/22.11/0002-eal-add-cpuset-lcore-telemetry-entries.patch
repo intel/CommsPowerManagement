@@ -1,4 +1,4 @@
-From 209a9711579aa81084211ac1895a8d01d0902642 Mon Sep 17 00:00:00 2001
+From 810d87bf69d79351cfa3089df920e4b726f269a5 Mon Sep 17 00:00:00 2001
 From: Anatoly Burakov <anatoly.burakov@intel.com>
 Date: Fri, 15 Jul 2022 13:12:45 +0000
 Subject: [PATCH 2/3] eal: add cpuset lcore telemetry entries
@@ -11,7 +11,7 @@ Signed-off-by: Anatoly Burakov <anatoly.burakov@intel.com>
  1 file changed, 46 insertions(+)
 
 diff --git a/lib/eal/common/eal_common_lcore_telemetry.c b/lib/eal/common/eal_common_lcore_telemetry.c
-index 1478e5a..f01ccd9 100644
+index 1478e5a48a..f01ccd9a65 100644
 --- a/lib/eal/common/eal_common_lcore_telemetry.c
 +++ b/lib/eal/common/eal_common_lcore_telemetry.c
 @@ -263,6 +263,49 @@ lcore_handle_busyness(const char *cmd __rte_unused,
@@ -75,5 +75,5 @@ index 1478e5a..f01ccd9 100644
  }
  
 -- 
-2.43.0
+2.25.1
 
